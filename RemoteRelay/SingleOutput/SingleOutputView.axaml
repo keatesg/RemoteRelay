@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:singleOutput="clr-namespace:RemoteRelay.SingleOutput"
+             xmlns:controls="clr-namespace:RemoteRelay.Controls"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              Background="Black"
              x:Class="RemoteRelay.SingleOutput.SingleOutputView"
@@ -10,61 +11,68 @@
 
     <Grid ShowGridLines="False">
         <Grid.RowDefinitions>
-            <RowDefinition Height="20*" />
-            <RowDefinition Height="40*" />
-            <RowDefinition Height="40*" />
+            <RowDefinition Height="15*" />  <!-- IP, Clock -->
+            <RowDefinition Height="15*" />  <!-- Status Message -->
+            <RowDefinition Height="50*" />  <!-- Input Buttons -->
+            <RowDefinition Height="20*" />  <!-- Footer Buttons -->
         </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition />
-            <ColumnDefinition />
-            <ColumnDefinition />
-            <ColumnDefinition />
-        </Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition />
+                <ColumnDefinition />
+                <ColumnDefinition />
+            </Grid.ColumnDefinitions>
 
-        <!-- IP Address in top left corner -->
-        <TextBlock Text="{Binding HostIpAddress}"
-                   Grid.Row="0"
-                   Grid.Column="0"
-                   HorizontalAlignment="Left"
-                   VerticalAlignment="Top"
-                   Margin="15,5,0,0"
-                   FontSize="14"
-                   Foreground="Gray"
-                   IsVisible="{Binding ShowIpOnScreen}" />
+        <!-- Header Grid -->
+        <Grid Grid.Row="0" Margin="15,5,15,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-        <!-- Date and Clock in top center -->
-        <StackPanel Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,5,0,0">
-            <TextBlock Text="{Binding CurrentDate}"
-                       FontSize="28"
-                       FontWeight="Bold"
-                       Foreground="White"
-                       VerticalAlignment="Center" />
-            <TextBlock Text="  ·  "
-                       FontSize="28"
-                       Foreground="Gray"
-                       VerticalAlignment="Center" />
-            <TextBlock Text="{Binding CurrentTime}"
-                       FontSize="28"
-                       FontWeight="Bold"
-                       Foreground="White"
-                       VerticalAlignment="Center" />
-        </StackPanel>
+            <!-- IP Address in top left corner -->
+            <Viewbox Grid.Column="0" HorizontalAlignment="Left" StretchDirection="DownOnly" Stretch="Uniform">
+                <TextBlock Text="{Binding HostIpAddress}"
+                           FontSize="14"
+                           Foreground="Gray"
+                           IsVisible="{Binding ShowIpOnScreen}" />
+            </Viewbox>
 
-        <Viewbox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="4" Stretch="Uniform">
-            <Label FontStretch="Normal"
-                   HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Content="{Binding StatusMessage}"
-                   HorizontalContentAlignment="Center"
-                   VerticalContentAlignment="Center"
-                   Padding="20" />
-        </Viewbox>
+            <!-- Date and Clock in top center -->
+            <Viewbox Grid.Column="1" HorizontalAlignment="Center" Stretch="Uniform">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding CurrentDate}"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="  ·  "
+                               FontSize="28"
+                               Foreground="Gray"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding CurrentTime}"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Viewbox>
+        </Grid>
 
+            <Viewbox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4" Stretch="Uniform">
+                <Label FontStretch="Normal"
+                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Content="{Binding StatusMessage}"
+                       HorizontalContentAlignment="Center"
+                       VerticalContentAlignment="Center"
+                       Padding="20" />
+            </Viewbox>
+            
         <!-- The buttons for source selection -->
         <ItemsControl ItemsSource="{Binding Inputs}"
                       Grid.ColumnSpan="4"
                       Grid.Column="0"
-                      Grid.Row="1"
+                      Grid.Row="2"
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -74,7 +82,7 @@
             <ItemsControl.ItemContainerTheme>
                 <ControlTheme TargetType="ContentPresenter">
                     <ControlTheme.Setters>
-                        <Setter Property="Margin" Value="10" />
+                        <Setter Property="Margin" Value="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.012'}" />
                     </ControlTheme.Setters>
                 </ControlTheme>
             </ItemsControl.ItemContainerTheme>
@@ -83,27 +91,26 @@
 
         <!-- The buttons for cancel, off, and confirm -->
         <ContentControl Content="{Binding Cancel}"
-                        Grid.Row="2"
+                        Grid.Row="3"
                         Grid.Column="0"
-                        Margin="10" />
+                        Margin="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.015'}" />
 
         <ContentControl Content="{Binding OffButton}"
-                        Grid.Row="2"
+                        Grid.Row="3"
                         Grid.Column="1"
-                        Margin="10" />
+                        Margin="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.015'}" />
 
         <Image Source="{Binding StationLogo}"
-               Grid.Row="2"
+               Grid.Row="3"
                Grid.Column="2"
-               Margin="10"
+               Margin="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.015'}"
                Stretch="Uniform"
                HorizontalAlignment="Center"
                VerticalAlignment="Center" />
 
         <ContentControl Content="{Binding Output}"
-                        Grid.Row="2"
+                        Grid.Row="3"
                         Grid.Column="3"
-                        Margin="10" />
+                        Margin="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.015'}" />
     </Grid>
-
 </UserControl>

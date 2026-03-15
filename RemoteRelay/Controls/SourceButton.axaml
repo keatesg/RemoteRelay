@@ -22,12 +22,12 @@
             VerticalAlignment="Stretch"
             HorizontalContentAlignment="Stretch"
             VerticalContentAlignment="Stretch"
-            Padding="10,15,10,15"
+            Padding="0"
             BorderBrush="Gray"
-            BorderThickness="5">
-        <Viewbox Stretch="Uniform">
+            BorderThickness="1">
+        <Viewbox Stretch="Uniform" Margin="2">
             <TextBlock Text="{Binding SourceName}" Foreground="{Binding ForegroundColor}" HorizontalAlignment="Center"
-                       VerticalAlignment="Center" Padding="10" />
+                       VerticalAlignment="Center" />
         </Viewbox>
     </Button>
 

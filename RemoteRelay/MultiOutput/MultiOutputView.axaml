@@ -13,62 +13,69 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="15*" />
-            <RowDefinition Height="70*" />
-            <RowDefinition Height="15*" />
+            <RowDefinition Height="15*" />  <!-- IP, Clock, Filter -->
+            <RowDefinition Height="15*" />  <!-- Status Message -->
+            <RowDefinition Height="50*" />  <!-- Input/Outputs -->
+            <RowDefinition Height="20*" />  <!-- Footer -->
         </Grid.RowDefinitions>
 
-        <!-- IP Address in top left corner -->
-        <TextBlock Text="{Binding HostIpAddress}"
-                   Grid.Row="0"
-                   HorizontalAlignment="Left"
-                   VerticalAlignment="Top"
-                   Margin="15,5,0,0"
-                   FontSize="14"
-                   Foreground="Gray"
-                   IsVisible="{Binding ShowIpOnScreen}" />
+        <!-- Header Grid -->
+        <Grid Grid.Row="0" Margin="15,5,15,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-        <!-- Date and Clock in top center -->
-        <StackPanel Grid.Row="0"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,5,0,0">
-            <TextBlock Text="{Binding CurrentDate}"
-                       FontSize="28"
-                       FontWeight="Bold"
-                       Foreground="White"
-                       VerticalAlignment="Center" />
-            <TextBlock Text="  ·  "
-                       FontSize="28"
-                       Foreground="Gray"
-                       VerticalAlignment="Center" />
-            <TextBlock Text="{Binding CurrentTime}"
-                       FontSize="28"
-                       FontWeight="Bold"
-                       Foreground="White"
-                       VerticalAlignment="Center" />
-        </StackPanel>
+            <!-- IP Address in top left corner -->
+            <Viewbox Grid.Column="0" HorizontalAlignment="Left" StretchDirection="DownOnly" Stretch="Uniform">
+                <TextBlock Text="{Binding HostIpAddress}"
+                           FontSize="14"
+                           Foreground="Gray"
+                           IsVisible="{Binding ShowIpOnScreen}" />
+            </Viewbox>
 
-        <!-- Filter status in top right corner -->
-        <TextBlock Text="{Binding FilterStatusMessage}"
-                   Grid.Row="0"
-                   HorizontalAlignment="Right"
-                   VerticalAlignment="Top"
-                   Margin="0,5,15,0"
-                   FontSize="14"
-                   Foreground="Gray"
-                   IsVisible="{Binding FilterStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <!-- Date and Clock in top center -->
+            <Viewbox Grid.Column="1" HorizontalAlignment="Center" Stretch="Uniform">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding CurrentDate}"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="  ·  "
+                               FontSize="28"
+                               Foreground="Gray"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding CurrentTime}"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Viewbox>
 
-        <Viewbox Grid.Row="0" Stretch="Uniform">
+            <!-- Filter status in top right corner -->
+            <Viewbox Grid.Column="2" HorizontalAlignment="Right" StretchDirection="DownOnly" Stretch="Uniform">
+                <TextBlock Text="{Binding FilterStatusMessage}"
+                           FontSize="14"
+                           Foreground="Gray"
+                           IsVisible="{Binding FilterStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </Viewbox>
+        </Grid>
+
+        <!-- Status Message -->
+        <Viewbox Grid.Row="1" Stretch="Uniform" Margin="20,0">
             <Label Content="{Binding StatusMessage}"
                    HorizontalAlignment="Stretch"
                    VerticalAlignment="Stretch"
                    HorizontalContentAlignment="Center"
                    VerticalContentAlignment="Center"
-                   Padding="20" />
+                   Padding="10" />
         </Viewbox>
 
         <!-- Layout for ≤2 inputs/outputs: inputs left, outputs right, stacked vertically -->
-        <Grid Grid.Row="1" Margin="20,10"
+        <Grid Grid.Row="2" Margin="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.015'}"
               IsVisible="{Binding UseVerticalLayout}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*" />
@@ -85,7 +92,7 @@
                 <ItemsControl.ItemContainerTheme>
                     <ControlTheme TargetType="ContentPresenter">
                         <ControlTheme.Setters>
-                            <Setter Property="Margin" Value="10" />
+                            <Setter Property="Margin" Value="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.012'}" />
                         </ControlTheme.Setters>
                     </ControlTheme>
                 </ItemsControl.ItemContainerTheme>
@@ -101,7 +108,7 @@
                 <ItemsControl.ItemContainerTheme>
                     <ControlTheme TargetType="ContentPresenter">
                         <ControlTheme.Setters>
-                            <Setter Property="Margin" Value="10" />
+                            <Setter Property="Margin" Value="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.012'}" />
                         </ControlTheme.Setters>
                     </ControlTheme>
                 </ItemsControl.ItemContainerTheme>
@@ -109,7 +116,7 @@
         </Grid>
 
         <!-- Horizontal layout (original) for >2 inputs/outputs: side by side -->
-        <Grid Grid.Row="1" Margin="20,10"
+        <Grid Grid.Row="2" Margin="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.015'}"
               IsVisible="{Binding !UseVerticalLayout}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*" />
@@ -126,7 +133,7 @@
                 <ItemsControl.ItemContainerTheme>
                     <ControlTheme TargetType="ContentPresenter">
                         <ControlTheme.Setters>
-                            <Setter Property="Margin" Value="10" />
+                            <Setter Property="Margin" Value="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.012'}" />
                         </ControlTheme.Setters>
                     </ControlTheme>
                 </ItemsControl.ItemContainerTheme>
@@ -142,14 +149,14 @@
                 <ItemsControl.ItemContainerTheme>
                     <ControlTheme TargetType="ContentPresenter">
                         <ControlTheme.Setters>
-                            <Setter Property="Margin" Value="10" />
+                            <Setter Property="Margin" Value="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.012'}" />
                         </ControlTheme.Setters>
                     </ControlTheme>
                 </ItemsControl.ItemContainerTheme>
             </ItemsControl>
         </Grid>
 
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*" />
                 <ColumnDefinition Width="1*" />
@@ -158,18 +165,18 @@
 
             <ContentControl Content="{Binding Cancel}"
                             Grid.Column="0"
-                            Margin="10" />
+                            Margin="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.015'}" />
 
             <Image Source="{Binding StationLogo}"
                    Grid.Column="1"
-                   Margin="10"
+                   Margin="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.015'}"
                    Stretch="Uniform"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center" />
 
             <ContentControl Content="{Binding OffButton}"
                             Grid.Column="2"
-                            Margin="10" />
+                            Margin="{Binding $parent[Window].Bounds.Height, Converter={x:Static controls:MarginConverter.Instance}, ConverterParameter='0.015'}" />
         </Grid>
     </Grid>
 

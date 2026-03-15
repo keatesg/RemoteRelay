@@ -9,7 +9,7 @@
         Title="SourceSwitcher"
         Width="600" Height="300"
         x:DataType="local:MainWindowViewModel"
-        WindowState="FullScreen">
+        WindowState="Normal">
 
     <Window.DataTemplates>
         <DataTemplate DataType="{x:Type singleOutput:SingleOutputViewModel}">
@@ -27,17 +27,21 @@
     </Window.DataTemplates>
 
     <DockPanel>
-        <TextBlock Text="{Binding UpdateMessage}"
-                   DockPanel.Dock="Top"
-                   HorizontalAlignment="Center"
-                   Foreground="Orange"
-                   FontWeight="Bold"
-                   Margin="5" 
-                   IsVisible="{Binding UpdateMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-        <TextBlock Text="{Binding ServerStatusMessage}"
-                   DockPanel.Dock="Top"
-                   HorizontalAlignment="Center"
-                   Margin="5" />
+        <Viewbox Stretch="Uniform" StretchDirection="DownOnly"
+                 DockPanel.Dock="Top"
+                 HorizontalAlignment="Center"
+                 Margin="5"
+                 IsVisible="{Binding UpdateMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding UpdateMessage}"
+                       Foreground="Orange"
+                       FontWeight="Bold" />
+        </Viewbox>
+        <Viewbox Stretch="Uniform" StretchDirection="DownOnly"
+                 DockPanel.Dock="Top"
+                 HorizontalAlignment="Center"
+                 Margin="5">
+            <TextBlock Text="{Binding ServerStatusMessage}" />
+        </Viewbox>
         <Button Content="⚙ Setup"
                 DockPanel.Dock="Bottom"
                 Command="{Binding OpenSetupCommand}"
