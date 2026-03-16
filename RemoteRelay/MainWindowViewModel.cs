@@ -148,6 +148,10 @@ public class MainWindowViewModel : ViewModelBase
                 OperationViewModel = null;
                 StartRetryTimer();
             }
+            else
+            {
+                _ = OnConnected();
+            }
         }));
 
         _clientSubscriptions = disposables;
@@ -363,8 +367,9 @@ public class MainWindowViewModel : ViewModelBase
         }
         else
         {
-            ServerStatusMessage = "Failed to retrieve valid settings from server.";
-            // OperationViewModel can be set to null since it's now nullable
+            ServerStatusMessage = "Failed to retrieve valid settings from server. Will retry...";
+            await Task.Delay(2000);
+            StartRetryTimer();
         }
     }
 

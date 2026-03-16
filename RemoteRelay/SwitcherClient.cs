@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -30,7 +30,7 @@ public class SwitcherClient
         _hubUri = hubUri;
         _settingsTcs = new TaskCompletionSource<AppSettings?>(TaskCreationOptions.RunContinuationsAsynchronously);
         _connection = new HubConnectionBuilder()
-           .WithAutomaticReconnect()
+           .WithAutomaticReconnect(new InfiniteRetryPolicy())
            .WithKeepAliveInterval(TimeSpan.FromSeconds(10))
            .WithUrl(hubUri)
            .AddJsonProtocol(options =>
@@ -99,6 +99,9 @@ public class SwitcherClient
     {
         if (IsConnected)
             return true;
+
+        if (_connection.State != HubConnectionState.Disconnected)
+            return false;
 
         try
         {
@@ -203,12 +206,21 @@ public class SwitcherClient
         }
     }
 
-    public Task<AppSettings?> GetSettingsAsync()
+    public async Task<AppSettings?> GetSettingsAsync(int timeoutMs = 15000)
     {
+        Task<AppSettings?> task;
         lock (_requestLock)
         {
-            return _settingsTcs.Task;
+            task = _settingsTcs.Task;
         }
+
+        if (await Task.WhenAny(task, Task.Delay(timeoutMs)) == task)
+        {
+            return await task;
+        }
+
+        System.Diagnostics.Debug.WriteLine($"GetSettingsAsync timed out after {timeoutMs}ms");
+        return null;
     }
 
     /// <summary>
@@ -298,6 +310,17 @@ public class SwitcherClient
             // If we fail to call Handshake, it likely means the server is old and doesn't have the endpoint
             System.Diagnostics.Debug.WriteLine($"Handshake failed: {ex.Message}");
             _compatibilityChanged.OnNext(CompatibilityStatus.ServerOutdated);
+        }
+    }
+
+    private class InfiniteRetryPolicy : IRetryPolicy
+    {
+        public TimeSpan? NextRetryDelay(RetryContext retryContext)
+        {
+            if (retryContext.PreviousRetryCount < 4)
+                return TimeSpan.FromSeconds(Math.Pow(2, retryContext.PreviousRetryCount));
+            
+            return TimeSpan.FromSeconds(15);
         }
     }
 }

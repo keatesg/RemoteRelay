@@ -48,6 +48,7 @@
                                Foreground="Gray"
                                VerticalAlignment="Center" />
                     <TextBlock Text="{Binding CurrentTime}"
+                               FontFamily="Consolas, Courier New, monospace"
                                FontSize="28"
                                FontWeight="Bold"
                                Foreground="White"
