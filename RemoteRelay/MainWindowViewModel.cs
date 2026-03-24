@@ -98,9 +98,11 @@ public class MainWindowViewModel : ViewModelBase
         _ = InitializeConnectionAsync();
     }
 
-    private void InitClient()
+    private void InitClient(string? tempHost = null, int? tempPort = null)
     {
-        var serverUri = new Uri($"http://{_clientConfig.Host}:{_clientConfig.Port}/relay");
+        var h = tempHost ?? (string.IsNullOrWhiteSpace(_clientConfig.Host) ? "localhost" : _clientConfig.Host);
+        var p = tempPort ?? _clientConfig.Port ?? 33101;
+        var serverUri = new Uri($"http://{h}:{p}/relay");
         SwitcherClient.InitializeInstance(serverUri);
         SetupClientSubscriptions();
     }
@@ -239,8 +241,8 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task InitializeConnectionAsync()
     {
-        // Auto-discovery if configured for localhost
-        if (_clientConfig.IsLocalConnection)
+        // Auto-discovery if configured for localhost or empty host
+        if (string.IsNullOrWhiteSpace(_clientConfig.Host) || _clientConfig.IsLocalConnection)
         {
             ServerStatusMessage = "Scanning for RemoteRelay server...";
             try
@@ -259,22 +261,18 @@ public class MainWindowViewModel : ViewModelBase
                         var newHost = ip.ToString();
                         var newPort = service.Port;
 
-                        // Only update if different
-                        if (!_clientConfig.Host.Equals(newHost, StringComparison.OrdinalIgnoreCase) || _clientConfig.Port != newPort)
+                        // Only re-initialize if it differs from what we would use by default
+                        var currentHost = string.IsNullOrWhiteSpace(_clientConfig.Host) ? "localhost" : _clientConfig.Host;
+                        var currentPort = _clientConfig.Port ?? 33101;
+                        if (!currentHost.Equals(newHost, StringComparison.OrdinalIgnoreCase) || currentPort != newPort)
                         {
                             ServerStatusMessage = $"Found server at {newHost}:{newPort}. Connecting...";
 
-                            _clientConfig.Host = newHost;
-                            _clientConfig.Port = newPort;
-                            SaveConfig();
-
-                            // Update SetupButton visibility based on new config (likely hidden now)
-                            ShowSetupButton = _clientConfig.IsLocalConnection;
-
-                            // Re-initialize client
+                            // Do NOT save the discovered Host and Port to _clientConfig so it discovers again next time
+                            // Re-initialize client with discovered host and port
                             DisposeClientSubscriptions();
                             await SwitcherClient.ResetInstanceAsync();
-                            InitClient();
+                            InitClient(newHost, newPort);
                         }
                     }
                 }

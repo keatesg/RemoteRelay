@@ -9,8 +9,8 @@ namespace RemoteRelay;
 
 public class ClientConfig
 {
-    public string Host { get; set; } = "localhost";
-    public int Port { get; set; } = 33101;
+    public string? Host { get; set; } = string.Empty;
+    public int? Port { get; set; } = null;
     public List<string>? ShownInputs { get; set; }
     public List<string>? ShownOutputs { get; set; }
 
@@ -22,7 +22,8 @@ public class ClientConfig
     {
         get
         {
-            if (Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+            if (string.IsNullOrWhiteSpace(Host) || 
+                Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
                 Host == "127.0.0.1")
                 return true;
 

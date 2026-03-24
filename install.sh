@@ -708,27 +708,40 @@ update_client_config_host() {
   if [ -f "$client_config" ]; then
     local tmp
     tmp=$(mktemp)
-    # Using jq if available is safer, but fallback to sed if needed?
-    # The script checks for jq dependency at start now, so let's try jq first if possible,
-    # but to be safe and consistent with the legacy sed approach (which preserves comments better sometimes, though json shouldn't have them):
     
     if command -v jq >/dev/null 2>&1; then
-       # update valid json with jq
-       jq --arg host "$server_address" '.Host = $host' "$client_config" > "$tmp" && mv "$tmp" "$client_config"
+       if [ -z "$server_address" ]; then
+           # Set Host to empty string or remove it for service discovery
+           jq 'del(.Host) | del(.Port)' "$client_config" > "$tmp" && mv "$tmp" "$client_config"
+           SUMMARY+=("Client configured to use Service Discovery")
+       else
+           jq --arg host "$server_address" '.Host = $host' "$client_config" > "$tmp" && mv "$tmp" "$client_config"
+           SUMMARY+=("Updated client host to $server_address")
+       fi
        chown "$APP_USER:$APP_USER" "$client_config"
-       SUMMARY+=("Updated client host to $server_address")
     else
        # fallback to sed
-        local escaped_address
-        escaped_address=$(printf '%s' "$server_address" | sed -e 's/[\\/&]/\\&/g')
-        if sed -E "s/(\"Host\"\s*:\s*\")([^\"]*)(\")/\\1$escaped_address\\3/" "$client_config" > "$tmp"; then
-          mv "$tmp" "$client_config"
-          chown "$APP_USER:$APP_USER" "$client_config"
-          SUMMARY+=("Updated client host to $server_address")
-        else
-          echo "Warning: failed to update $client_config" >&2
-          rm -f "$tmp"
-        fi
+       if [ -z "$server_address" ]; then
+          if sed -E 's/("Host"\s*:\s*")[^"]*(")/\1\2/' "$client_config" > "$tmp"; then
+            mv "$tmp" "$client_config"
+            chown "$APP_USER:$APP_USER" "$client_config"
+            SUMMARY+=("Client configured to use Service Discovery")
+          else
+            echo "Warning: failed to update $client_config" >&2
+            rm -f "$tmp"
+          fi
+       else
+          local escaped_address
+          escaped_address=$(printf '%s' "$server_address" | sed -e 's/[\\/&]/\\&/g')
+          if sed -E "s/(\"Host\"\s*:\s*\")([^\"]*)(\")/\\1$escaped_address\\3/" "$client_config" > "$tmp"; then
+            mv "$tmp" "$client_config"
+            chown "$APP_USER:$APP_USER" "$client_config"
+            SUMMARY+=("Updated client host to $server_address")
+          else
+            echo "Warning: failed to update $client_config" >&2
+            rm -f "$tmp"
+          fi
+       fi
     fi
   fi
 }
@@ -858,15 +871,22 @@ if $DO_INSTALL_CLIENT; then
          fi
      fi
 
-     # If no existing config (fresh install), default is empty (implies auto-discovery via localhost)
-     # We prompt the user.
-     if [ -n "$local_default" ]; then
-        read -r -p "Server address for client [$local_default]: " input_addr
-        SERVER_ADDRESS=${input_addr:-$local_default}
+     echo "Configure Client Connection:"
+     echo "  1) Use Service Discovery (Auto-detect server on network) [Default]"
+     echo "  2) Specify Server IP/Hostname"
+     read -r -p "Choice [1]: " conn_choice
+     conn_choice=${conn_choice:-1}
+     
+     if [ "$conn_choice" = "2" ]; then
+        if [ -n "$local_default" ]; then
+            read -r -p "Enter Server IP/Hostname [$local_default]: " input_addr
+            SERVER_ADDRESS=${input_addr:-$local_default}
+        else
+            read -r -p "Enter Server IP/Hostname: " input_addr
+            SERVER_ADDRESS=${input_addr:-""}
+        fi
      else
-        read -r -p "Server address for client (leave empty for auto-discovery): " input_addr
-        # If empty, use localhost which triggers auto-discovery in the app
-        SERVER_ADDRESS=${input_addr:-"localhost"}
+        SERVER_ADDRESS=""
      fi
   fi
 fi
