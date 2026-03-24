@@ -71,6 +71,8 @@ public class MainWindowViewModel : ViewModelBase
 
     public bool IsOperationViewReady => _operationViewModel != null;
 
+    public bool IsFullscreen => _clientConfig.IsFullscreen ?? true;
+
     private bool _showSetupButton;
     public bool ShowSetupButton
     {

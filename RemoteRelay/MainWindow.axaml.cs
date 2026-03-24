@@ -8,7 +8,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        DataContext = new MainWindowViewModel();
+        var vm = new MainWindowViewModel();
+        DataContext = vm;
+        
+        WindowState = vm.IsFullscreen ? WindowState.FullScreen : WindowState.Normal;
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

@@ -14,6 +14,7 @@ public class ClientConfig
     public List<string>? ShownInputs { get; set; }
     public List<string>? ShownOutputs { get; set; }
     public bool? ShowIpOnScreen { get; set; }
+    public bool? IsFullscreen { get; set; } = true;
 
     /// <summary>
     /// Returns true if the host is localhost, 127.0.0.1, or matches

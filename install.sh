@@ -670,6 +670,19 @@ update_client_files() {
   echo "Restoring preserved configuration files..."
   restore_preserved_file "$backup_server_details" "$CLIENT_INSTALL_DIR/ServerDetails.json"
   restore_preserved_file "$backup_client_config" "$CLIENT_INSTALL_DIR/ClientConfig.json"
+  
+  # Ensure IsFullscreen is set to true in ClientConfig.json by default
+  local client_config_path="$CLIENT_INSTALL_DIR/ClientConfig.json"
+  if [ -f "$client_config_path" ]; then
+    if command -v jq >/dev/null 2>&1; then
+      local tmp
+      tmp=$(mktemp)
+      jq '.IsFullscreen = true' "$client_config_path" > "$tmp" && mv "$tmp" "$client_config_path"
+    fi
+  else
+    echo '{"IsFullscreen": true}' > "$client_config_path"
+  fi
+  
   chown -R "$APP_USER:$APP_USER" "$CLIENT_INSTALL_DIR"
 
   local enable_kiosk="false"

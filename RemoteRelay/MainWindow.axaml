@@ -8,8 +8,7 @@
         x:Class="RemoteRelay.MainWindow"
         Title="SourceSwitcher"
         Width="600" Height="300"
-        x:DataType="local:MainWindowViewModel"
-        WindowState="Normal">
+        x:DataType="local:MainWindowViewModel">
 
     <Window.DataTemplates>
         <DataTemplate DataType="{x:Type singleOutput:SingleOutputViewModel}">
