@@ -662,6 +662,10 @@ update_client_files() {
   preserve_file_if_exists "$CLIENT_INSTALL_DIR/ServerDetails.json" backup_server_details
   preserve_file_if_exists "$CLIENT_INSTALL_DIR/ClientConfig.json" backup_client_config
 
+  echo "Stopping existing client if running..."
+  pkill -f "start-client.sh" || true
+  pkill -x "RemoteRelay" || true
+
   echo "Installing new client files..."
   find "$CLIENT_INSTALL_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
   cp -a "$CLIENT_FILES_SOURCE_DIR/." "$CLIENT_INSTALL_DIR/"
@@ -705,6 +709,16 @@ update_client_files() {
     echo "Kiosk mode enabled: display will stay awake."
   else
     echo "Kiosk mode skipped: screen blanking settings unchanged."
+  fi
+
+  echo "Re-launching client..."
+  if [ -x "$CLIENT_INSTALL_DIR/start-client.sh" ]; then
+    local current_user="${SUDO_USER:-$APP_USER}"
+    if [ -n "$current_user" ]; then
+      local user_id
+      user_id=$(id -u "$current_user")
+      su - "$current_user" -c "export XDG_RUNTIME_DIR=/run/user/$user_id; export WAYLAND_DISPLAY=wayland-1; export DISPLAY=:0; nohup $CLIENT_INSTALL_DIR/start-client.sh >/dev/null 2>&1 &"
+    fi
   fi
 
   local client_summary="Client files installed at $CLIENT_INSTALL_DIR (autostart configured)"

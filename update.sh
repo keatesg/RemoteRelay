@@ -9,6 +9,16 @@ echo "RemoteRelay Updater v${UPDATE_SCRIPT_VERSION}"
 echo ""
 
 GITHUB_REPO="RebelliousPebble/RemoteRelay"
+
+PRE_RELEASE=false
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -p|--pre-release) PRE_RELEASE=true ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
 INSTALL_DIR_BASE="/home/$SUDO_USER/RemoteRelay" # Approximation, refined below
 if [ -z "$SUDO_USER" ]; then
   echo "Error: This script must be run as root (sudo)." >&2
@@ -78,7 +88,14 @@ if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
     exit 1
 fi
 
-LATEST_RELEASE_JSON=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest")
+if [ "$PRE_RELEASE" = true ]; then
+    echo "Checking for pre-release updates..."
+    LATEST_RELEASE_JSON=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases" | jq -r '.[0]')
+else
+    echo "Checking for stable updates..."
+    LATEST_RELEASE_JSON=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest")
+fi
+
 LATEST_VERSION_TAG=$(echo "$LATEST_RELEASE_JSON" | jq -r .tag_name)
 LATEST_VERSION=${LATEST_VERSION_TAG#v} # Remove 'v' prefix if present
 
