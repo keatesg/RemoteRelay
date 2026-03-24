@@ -19,8 +19,8 @@ public class MultiOutputViewModel : OperationViewModelBase
 
     public string FilterStatusMessage { get; }
 
-    public MultiOutputViewModel(AppSettings settings, string filterStatusMessage = "")
-        : base(settings)
+    public MultiOutputViewModel(AppSettings settings, bool? showIpOverride = null, string filterStatusMessage = "")
+        : base(settings, showIpOverride)
     {
         FilterStatusMessage = filterStatusMessage;
         Inputs = settings.Sources.Select(source => new SourceButtonViewModel(source)).ToList();

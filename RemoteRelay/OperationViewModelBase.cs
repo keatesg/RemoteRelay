@@ -32,11 +32,14 @@ public abstract class OperationViewModelBase : ViewModelBase, IDisposable
     private string _currentDate = DateTime.Now.ToString("dddd d MMMM yyyy");
     private readonly DispatcherTimer _clockTimer;
 
-    protected OperationViewModelBase(AppSettings settings, int timeoutSeconds = 3)
+    private bool? _showIpOverride;
+
+    protected OperationViewModelBase(AppSettings settings, bool? showIpOverride = null, int timeoutSeconds = 3)
     {
+        _showIpOverride = showIpOverride;
         Settings = settings;
         TimeoutSeconds = timeoutSeconds;
-        ShowIpOnScreen = settings.ShowIpOnScreen;
+        ShowIpOnScreen = _showIpOverride ?? settings.ShowIpOnScreen;
         Cancel = new SourceButtonViewModel("Cancel");
 
         Cancel.Clicked.Subscribe(_ => _cancelRequests.OnNext(Unit.Default)).DisposeWith(_disposables);
@@ -65,7 +68,7 @@ public abstract class OperationViewModelBase : ViewModelBase, IDisposable
            .ObserveOn(RxApp.MainThreadScheduler)
            .Subscribe(newSettings =>
            {
-               ShowIpOnScreen = newSettings.ShowIpOnScreen;
+               ShowIpOnScreen = _showIpOverride ?? newSettings.ShowIpOnScreen;
            })
            .DisposeWith(_disposables);
 

@@ -455,8 +455,8 @@ public class MainWindowViewModel : ViewModelBase
         FilterStatusMessage = isFiltered ? "Filtered" : "All";
 
         OperationViewModel = filteredSettings.Outputs.Count > 1
-           ? new MultiOutputViewModel(filteredSettings, FilterStatusMessage)
-           : new SingleOutputViewModel(filteredSettings);
+           ? new MultiOutputViewModel(filteredSettings, _clientConfig.ShowIpOnScreen, FilterStatusMessage)
+           : new SingleOutputViewModel(filteredSettings, _clientConfig.ShowIpOnScreen);
     }
 
     private class ServerDetails

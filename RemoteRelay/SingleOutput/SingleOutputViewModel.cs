@@ -13,8 +13,8 @@ namespace RemoteRelay.SingleOutput;
 
 public class SingleOutputViewModel : OperationViewModelBase
 {
-    public SingleOutputViewModel(AppSettings settings)
-       : base(settings)
+    public SingleOutputViewModel(AppSettings settings, bool? showIpOverride = null)
+       : base(settings, showIpOverride)
     {
         Inputs = settings.Sources.Select(x => new SourceButtonViewModel(x)).ToArray();
 

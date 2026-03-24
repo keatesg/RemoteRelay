@@ -13,6 +13,7 @@ public class ClientConfig
     public int? Port { get; set; } = null;
     public List<string>? ShownInputs { get; set; }
     public List<string>? ShownOutputs { get; set; }
+    public bool? ShowIpOnScreen { get; set; }
 
     /// <summary>
     /// Returns true if the host is localhost, 127.0.0.1, or matches

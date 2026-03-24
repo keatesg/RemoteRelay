@@ -66,7 +66,7 @@
         </Grid>
 
         <!-- Status Message -->
-        <Viewbox Grid.Row="1" Stretch="Uniform" Margin="20,0">
+        <Viewbox Grid.Row="1" Stretch="Uniform" Margin="20,0" IsVisible="{Binding ShowIpOnScreen}">
             <Label Content="{Binding StatusMessage}"
                    HorizontalAlignment="Stretch"
                    VerticalAlignment="Stretch"
