@@ -19,6 +19,8 @@ public class SwitcherState : IDisposable
     private readonly Dictionary<int, DateTime> _lastPinEventTime = new();
     private readonly object _stateLock = new();
     private static readonly TimeSpan _debounceTime = TimeSpan.FromMilliseconds(200);
+    private static readonly TimeSpan _startupIgnoreTime = TimeSpan.FromMilliseconds(1500);
+    private DateTime _lastInitializationTime = DateTime.MinValue;
 
     private GpioController? _gpiController;
     private AppSettings _settings;
@@ -312,6 +314,8 @@ public class SwitcherState : IDisposable
         
         InitializeInactiveRelayPin();
         SetupPhysicalButtons();
+        
+        _lastInitializationTime = DateTime.UtcNow;
     }
 
     private void ApplyDefaultRoutes()
@@ -443,6 +447,12 @@ public class SwitcherState : IDisposable
     private void HandlePhysicalButtonChangeEvent(object sender, PinValueChangedEventArgs e)
     {
         DateTime now = DateTime.UtcNow;
+        if (now - _lastInitializationTime < _startupIgnoreTime)
+        {
+            Console.WriteLine($"Ignoring startup transient event on pin {e.PinNumber}.");
+            return;
+        }
+
         if (_lastPinEventTime.TryGetValue(e.PinNumber, out DateTime lastEventTime))
         {
             if (now - lastEventTime < _debounceTime)
