@@ -38,7 +38,8 @@
         <Viewbox Stretch="Uniform" StretchDirection="DownOnly"
                  DockPanel.Dock="Top"
                  HorizontalAlignment="Center"
-                 Margin="5">
+                 Margin="5"
+                 IsVisible="{Binding ShowIpOnScreen}">
             <TextBlock Text="{Binding ServerStatusMessage}" />
         </Viewbox>
         <Button Content="⚙ Setup"

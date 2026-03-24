@@ -73,6 +73,13 @@ public class MainWindowViewModel : ViewModelBase
 
     public bool IsFullscreen => _clientConfig.IsFullscreen ?? true;
 
+    private bool _showIpOnScreen = true;
+    public bool ShowIpOnScreen
+    {
+        get => _showIpOnScreen;
+        set => this.RaiseAndSetIfChanged(ref _showIpOnScreen, value);
+    }
+
     private bool _showSetupButton;
     public bool ShowSetupButton
     {
@@ -225,6 +232,8 @@ public class MainWindowViewModel : ViewModelBase
             _clientConfig = new ClientConfig();
             SaveConfig();
         }
+        
+        ShowIpOnScreen = _clientConfig.ShowIpOnScreen ?? true;
     }
 
     private void SaveConfig()
@@ -375,6 +384,8 @@ public class MainWindowViewModel : ViewModelBase
 
     private void ApplySettings(AppSettings settings)
     {
+        ShowIpOnScreen = _clientConfig.ShowIpOnScreen ?? settings.ShowIpOnScreen;
+
         // Handle unconfigured server
         if (!settings.IsConfigured)
         {
