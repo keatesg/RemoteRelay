@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using RemoteRelay.Common;
+using RemoteRelay.Server.Drivers;
 using RemoteRelay.Server.Services;
 
 namespace RemoteRelay.Server;
@@ -22,11 +23,11 @@ public class SwitcherState : IDisposable
     private static readonly TimeSpan _startupIgnoreTime = TimeSpan.FromMilliseconds(1500);
     private DateTime _lastInitializationTime = DateTime.MinValue;
 
-    private GpioController? _gpiController;
+    private IRelayDriver? _relayDriver;
     private AppSettings _settings;
     private List<Source> _sources = new();
     private int _outputCount;
-    private GpioPin? _inactiveRelayPin;
+    private bool _inactiveRelayConfigured;
 
     public SwitcherState(AppSettings settings, IHubContext<RelayHub> hubContext, ILogger<SwitcherState> logger, TcpMessageService tcpMessageService)
     {
@@ -206,43 +207,23 @@ public class SwitcherState : IDisposable
 
         lock (_stateLock)
         {
-            if (_gpiController == null)
+            if (_relayDriver == null)
             {
-                Console.WriteLine("TestPin: GPIO controller not initialized");
+                Console.WriteLine("TestPin: relay driver not initialized");
                 return;
             }
 
             try
             {
-                // Determine the value to write based on activeLow and desired state
-                PinValue valueToWrite;
-                if (active)
+                _relayDriver.RegisterChannel(new RelayConfig
                 {
-                    valueToWrite = activeLow ? PinValue.Low : PinValue.High;
-                }
-                else
-                {
-                    valueToWrite = activeLow ? PinValue.High : PinValue.Low;
-                }
-
-                // Open pin if not already open
-                if (!_gpiController.IsPinOpen(pin))
-                {
-                    _gpiController.OpenPin(pin, PinMode.Output);
-                }
-                else
-                {
-                    // Ensure it's in output mode
-                    var currentMode = _gpiController.GetPinMode(pin);
-                    if (currentMode != PinMode.Output)
-                    {
-                        _gpiController.SetPinMode(pin, PinMode.Output);
-                    }
-                }
-
-                _gpiController.Write(pin, valueToWrite);
-                MockGpioDriver.UpdatePinState(pin, valueToWrite);
-                Console.WriteLine($"TestPin: Set pin {pin} to {valueToWrite} (active={active}, activeLow={activeLow})");
+                    RelayPin = pin,
+                    ActiveLow = activeLow,
+                    SourceName = string.Empty,
+                    OutputName = string.Empty
+                });
+                _relayDriver.SetRelay(pin, active);
+                Console.WriteLine($"TestPin: Set channel {pin} to active={active} (activeLow={activeLow}) via {_relayDriver.Name}");
             }
             catch (Exception ex)
             {
@@ -292,26 +273,7 @@ public class SwitcherState : IDisposable
     {
         _settings = settings;
 
-        // Try to initialize real GPIO, fallback to mock if it fails
-        if (IsGpiEnvironment())
-        {
-            try
-            {
-                _gpiController = new GpioController();
-                Console.WriteLine("GPIO controller initialized successfully.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"WARNING: Failed to initialize GPIO controller: {ex.Message}");
-                Console.WriteLine("Falling back to mock GPIO mode.");
-                _gpiController = new GpioController(new MockGpioDriver());
-            }
-        }
-        else
-        {
-            _gpiController = new GpioController(new MockGpioDriver());
-            Console.WriteLine("Using mock GPIO mode (not on GPIO-capable hardware or UseMockGpio=true).");
-        }
+        _relayDriver = RelayDriverFactory.Create(_settings, _logger);
 
         _sources = new List<Source>();
 
@@ -321,7 +283,7 @@ public class SwitcherState : IDisposable
             foreach (var outputName in _settings.Routes.Where(x => x.SourceName == source).Select(x => x.OutputName).Distinct())
             {
                 var relayConfig = _settings.Routes.First(x => x.SourceName == source && x.OutputName == outputName);
-                newSource.AddOutputPin(_gpiController, relayConfig);
+                newSource.AddOutput(_relayDriver, relayConfig);
             }
             _sources.Add(newSource);
         }
@@ -400,23 +362,32 @@ public class SwitcherState : IDisposable
 
     private void InitializeInactiveRelayPin()
     {
-        _inactiveRelayPin = null;
+        _inactiveRelayConfigured = false;
 
-        if (_settings.InactiveRelay == null || _settings.InactiveRelay.Pin <= 0 || _gpiController == null)
+        if (_settings.InactiveRelay == null || _settings.InactiveRelay.Pin <= 0 || _relayDriver == null)
         {
             return;
         }
 
         try
         {
-            _inactiveRelayPin = _gpiController.OpenPin(_settings.InactiveRelay.Pin, PinMode.Output);
-            _inactiveRelayPin.Write(_settings.InactiveRelay.GetActivePinValue());
-            Console.WriteLine($"Inactive relay pin {_settings.InactiveRelay.Pin} initialized to active state ({_settings.InactiveRelay.GetActivePinValue()}).");
+            // InactiveState=High means "inactive when High" => activeLow=true (energized=Low)
+            var activeLow = string.Equals(_settings.InactiveRelay.InactiveState, "High", StringComparison.OrdinalIgnoreCase);
+            _relayDriver.RegisterChannel(new RelayConfig
+            {
+                RelayPin = _settings.InactiveRelay.Pin,
+                ActiveLow = activeLow,
+                SourceName = "_inactive",
+                OutputName = "_inactive"
+            });
+            _relayDriver.SetRelay(_settings.InactiveRelay.Pin, energized: true);
+            _inactiveRelayConfigured = true;
+            Console.WriteLine($"Inactive relay channel {_settings.InactiveRelay.Pin} initialized to active state.");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error initializing inactive relay pin {_settings.InactiveRelay.Pin}: {ex.Message}");
-            _inactiveRelayPin = null;
+            _inactiveRelayConfigured = false;
         }
     }
 
@@ -424,8 +395,12 @@ public class SwitcherState : IDisposable
     {
         _lastPinEventTime.Clear();
 
-        if (_settings.PhysicalSourceButtons == null || _gpiController == null)
+        if (_settings.PhysicalSourceButtons == null || _relayDriver is not IGpioInputs inputs)
         {
+            if (_settings.PhysicalSourceButtons != null && _settings.PhysicalSourceButtons.Count > 0 && _relayDriver is not IGpioInputs)
+            {
+                Console.WriteLine($"PhysicalSourceButtons configured but driver '{_relayDriver?.Name}' does not support GPIO inputs. Buttons disabled.");
+            }
             return;
         }
 
@@ -443,19 +418,11 @@ public class SwitcherState : IDisposable
             Console.WriteLine($"Setting up physical button for source '{sourceNameForButton}' on pin {buttonConfig.PinNumber} with trigger state {buttonConfig.TriggerState}");
             try
             {
-                if (!_gpiController.IsPinOpen(buttonConfig.PinNumber))
-                {
-                    _gpiController.OpenPin(buttonConfig.PinNumber, PinMode.InputPullUp);
-                }
-                else
-                {
-                    _gpiController.SetPinMode(buttonConfig.PinNumber, PinMode.InputPullUp);
-                }
-
-                _gpiController.RegisterCallbackForPinValueChangedEvent(
-                   buttonConfig.PinNumber,
-                   buttonConfig.GetTriggerEventType(),
-                   HandlePhysicalButtonChangeEvent);
+                inputs.OpenInputPin(buttonConfig.PinNumber, PinMode.InputPullUp);
+                inputs.RegisterButton(
+                    buttonConfig.PinNumber,
+                    buttonConfig.GetTriggerEventType(),
+                    HandlePhysicalButtonChangeEvent);
                 Console.WriteLine($"Successfully registered callback for pin {buttonConfig.PinNumber} for source '{sourceNameForButton}'.");
             }
             catch (Exception ex)
@@ -566,13 +533,12 @@ public class SwitcherState : IDisposable
 
     private void SetInactiveRelayToInactiveStateInternal()
     {
-        if (_inactiveRelayPin != null && _settings.InactiveRelay != null)
+        if (_inactiveRelayConfigured && _settings.InactiveRelay != null && _relayDriver != null)
         {
             try
             {
-                var inactiveValue = _settings.InactiveRelay.GetInactivePinValue();
-                _inactiveRelayPin.Write(inactiveValue);
-                Console.WriteLine($"Inactive relay pin {_settings.InactiveRelay.Pin} set to inactive state ({inactiveValue}).");
+                _relayDriver.SetRelay(_settings.InactiveRelay.Pin, energized: false);
+                Console.WriteLine($"Inactive relay channel {_settings.InactiveRelay.Pin} set to inactive state.");
             }
             catch (Exception ex)
             {
@@ -583,70 +549,40 @@ public class SwitcherState : IDisposable
 
     private void CleanupController()
     {
-        if (_inactiveRelayPin != null)
-        {
-            try
-            {
-                _inactiveRelayPin.Dispose();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Error disposing inactive relay pin");
-            }
-            finally
-            {
-                _inactiveRelayPin = null;
-            }
-        }
+        _inactiveRelayConfigured = false;
 
-        foreach (var buttonEntry in _settings.PhysicalSourceButtons ?? new Dictionary<string, PhysicalButtonConfig>())
+        if (_relayDriver is IGpioInputs inputs && _settings.PhysicalSourceButtons != null)
         {
-            try
+            foreach (var buttonEntry in _settings.PhysicalSourceButtons)
             {
-                if (_gpiController?.IsPinOpen(buttonEntry.Value.PinNumber) == true)
+                try
                 {
-                    _gpiController.UnregisterCallbackForPinValueChangedEvent(
-                       buttonEntry.Value.PinNumber,
-                       HandlePhysicalButtonChangeEvent);
-                    _gpiController.ClosePin(buttonEntry.Value.PinNumber);
+                    inputs.UnregisterButton(buttonEntry.Value.PinNumber, HandlePhysicalButtonChangeEvent);
                 }
-            }
-            catch
-            {
-                // Ignore cleanup errors for buttons
+                catch
+                {
+                    // Ignore cleanup errors for buttons
+                }
             }
         }
 
         _sources.Clear();
         _lastPinEventTime.Clear();
 
-        if (_gpiController != null)
+        if (_relayDriver != null)
         {
             try
             {
-                _gpiController.Dispose();
+                _relayDriver.Dispose();
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error disposing GPIO controller");
+                _logger.LogWarning(ex, "Error disposing relay driver");
             }
             finally
             {
-                _gpiController = null;
+                _relayDriver = null;
             }
         }
-    }
-
-    private bool IsGpiEnvironment()
-    {
-        if (_settings.UseMockGpio)
-            return false;
-
-        if (Environment.OSVersion.Platform != PlatformID.Unix)
-            return false;
-
-        // Check if GPIO is actually available on the system
-        // On Linux, GPIO hardware is typically exposed via /sys/class/gpio
-        return Directory.Exists("/sys/class/gpio");
     }
 }

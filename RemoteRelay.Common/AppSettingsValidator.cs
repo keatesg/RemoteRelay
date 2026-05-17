@@ -15,6 +15,7 @@ public static class AppSettingsValidator
         ValidateDefaultRoutes(settings, errors);
         ValidatePhysicalButtons(settings, errors);
         ValidateInactiveRelay(settings, errors);
+        ValidateRelayDriver(settings, errors);
 
         if (errors.Count == 0)
         {
@@ -152,6 +153,47 @@ public static class AppSettingsValidator
         else if (settings.InactiveRelay.Pin > 40)
         {
             errors.Add($"Inactive relay pin '{settings.InactiveRelay.Pin}' exceeds maximum valid pin (40).");
+        }
+    }
+
+    private static void ValidateRelayDriver(AppSettings settings, List<string> errors)
+    {
+        var driver = settings.RelayDriver?.Trim();
+        if (string.IsNullOrEmpty(driver) || string.Equals(driver, "Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var known = new[] { "Mock", "RpiGpio", "Gpio", "Rpi", "K8090", "Velleman" };
+        if (!known.Any(k => string.Equals(k, driver, StringComparison.OrdinalIgnoreCase)))
+        {
+            errors.Add($"RelayDriver '{settings.RelayDriver}' is not recognised. Valid values: Auto, Mock, RpiGpio, K8090.");
+            return;
+        }
+
+        if (string.Equals(driver, "K8090", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(driver, "Velleman", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(settings.K8090?.Port))
+            {
+                errors.Add("RelayDriver is 'K8090' but K8090.Port is not set in config.");
+            }
+
+            if (settings.Routes != null)
+            {
+                foreach (var route in settings.Routes)
+                {
+                    if (route.RelayPin < 1 || route.RelayPin > 8)
+                    {
+                        errors.Add($"Route {route.SourceName}->{route.OutputName} uses channel {route.RelayPin}; K8090 only supports channels 1-8.");
+                    }
+                }
+            }
+
+            if (settings.InactiveRelay != null && (settings.InactiveRelay.Pin < 1 || settings.InactiveRelay.Pin > 8))
+            {
+                errors.Add($"InactiveRelay.Pin {settings.InactiveRelay.Pin} is out of K8090 channel range 1-8.");
+            }
         }
     }
 

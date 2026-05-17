@@ -6,9 +6,10 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR; // Added for IHubContext
 using Microsoft.Extensions.Logging;
-using System.Device.Gpio;
+using Microsoft.Extensions.Logging.Abstractions;
 using RemoteRelay.Common;
 using RemoteRelay.Server.Configuration;
+using RemoteRelay.Server.Drivers;
 using RemoteRelay.Server.Services;
 
 namespace RemoteRelay.Server;
@@ -17,19 +18,6 @@ public class Program
 {
     private static readonly string ErrorLogPath = Path.Combine(AppContext.BaseDirectory, "server_error.log");
     private static readonly DateTime StartTime = DateTime.UtcNow;
-    // Helper method to determine GPIO environment
-    private static bool IsGpiEnvironment(bool useMockGpio)
-    {
-        if (useMockGpio)
-            return false;
-
-        if (Environment.OSVersion.Platform != PlatformID.Unix)
-            return false;
-
-        // Check if GPIO is actually available on the system
-        // On Linux, GPIO hardware is typically exposed via /sys/class/gpio
-        return Directory.Exists("/sys/class/gpio");
-    }
 
     public static void Main(string[] args)
     {
@@ -44,7 +32,7 @@ public class Program
         }
         if (args.Length == 5 && args[0] == "set-inactive-relay" && args[1] == "--pin" && args[3] == "--state")
         {
-            GpioController? gpioController = null;
+            IRelayDriver? driver = null;
             try
             {
                 if (!int.TryParse(args[2], out int pin) || pin <= 0)
@@ -55,15 +43,16 @@ public class Program
                 }
 
                 string stateArg = args[4];
-                PinValue valueToSet;
+                bool energized;
 
                 if (stateArg.Equals("High", StringComparison.OrdinalIgnoreCase))
                 {
-                    valueToSet = PinValue.High;
+                    // "High" historically meant pin held High; with activeLow=true that is the de-energized state.
+                    energized = false;
                 }
                 else if (stateArg.Equals("Low", StringComparison.OrdinalIgnoreCase))
                 {
-                    valueToSet = PinValue.Low;
+                    energized = true;
                 }
                 else
                 {
@@ -72,27 +61,20 @@ public class Program
                     return;
                 }
 
-                if (IsGpiEnvironment(false))
-                    gpioController = new GpioController();
-                else
-                    gpioController = new GpioController(new MockGpioDriver());
-
-                if (!gpioController!.IsPinOpen(pin))
+                var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+                AppSettings settings = File.Exists(configPath)
+                    ? LoadInitialSettings(configPath)
+                    : new AppSettings();
+                driver = RelayDriverFactory.Create(settings, NullLogger<Program>.Instance);
+                driver.RegisterChannel(new RelayConfig
                 {
-                    gpioController!.OpenPin(pin, PinMode.Output);
-                }
-                else
-                {
-                    var currentPinMode = gpioController!.GetPinMode(pin);
-                    if (currentPinMode != PinMode.Output)
-                    {
-                        Console.WriteLine($"Warning: Pin {pin} was already open with mode {currentPinMode}. Setting to Output mode.");
-                        gpioController!.SetPinMode(pin, PinMode.Output);
-                    }
-                }
-
-                gpioController!.Write(pin, valueToSet);
-                Console.WriteLine($"Successfully set pin {pin} to {valueToSet}");
+                    RelayPin = pin,
+                    ActiveLow = true,
+                    SourceName = "_inactive",
+                    OutputName = "_inactive"
+                });
+                driver.SetRelay(pin, energized);
+                Console.WriteLine($"Successfully set channel {pin} to {stateArg} (energized={energized}) via {driver.Name}");
                 Environment.Exit(0);
             }
             catch (Exception ex)
@@ -102,7 +84,7 @@ public class Program
             }
             finally
             {
-                gpioController?.Dispose();
+                driver?.Dispose();
             }
             return; // Exit Main after handling command-line operation
         }

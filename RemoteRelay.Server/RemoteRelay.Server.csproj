@@ -11,6 +11,7 @@
   <PackageReference Include="SkiaSharp" Version="3.116.1" />
   <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.116.1" />
     <PackageReference Include="System.Device.Gpio" Version="4.2.0" />
+    <PackageReference Include="System.IO.Ports" Version="10.0.0" />
     <PackageReference Include="Zeroconf" Version="3.7.16" />
   </ItemGroup>
 

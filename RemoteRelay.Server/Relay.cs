@@ -1,80 +1,78 @@
-using System.Device.Gpio;
 using RemoteRelay.Common;
+using RemoteRelay.Server.Drivers;
 
 namespace RemoteRelay.Server;
 
 public class Source
 {
-   private readonly Dictionary<string, (GpioPin Pin, RelayConfig Config)> _relayOutputPins;
+   private readonly Dictionary<string, RelayConfig> _outputs;
+   private IRelayDriver? _driver;
 
    public Source(string sourceName)
    {
-      _relayOutputPins = new Dictionary<string, (GpioPin Pin, RelayConfig Config)>();
+      _outputs = new Dictionary<string, RelayConfig>();
       _sourceName = sourceName;
    }
 
    public string _sourceName { get; set; }
 
-   public void AddOutputPin(GpioController controller, RelayConfig config)
+   public void AddOutput(IRelayDriver driver, RelayConfig config)
    {
-      var pin = controller.OpenPin(config.RelayPin, PinMode.Output);
-      _relayOutputPins.Add(config.OutputName, (pin, config));
+      _driver = driver;
+      driver.RegisterChannel(config);
+      _outputs[config.OutputName] = config;
    }
 
    public void EnableOutput(string output = "")
    {
       Console.WriteLine($"EnableOutput called with output: '{output}'");
-      Console.WriteLine($"Available outputs: {string.Join(", ", _relayOutputPins.Keys)}");
-      
-      if (_relayOutputPins.ContainsKey(output))
+      Console.WriteLine($"Available outputs: {string.Join(", ", _outputs.Keys)}");
+
+      if (_driver == null)
       {
-         Console.WriteLine($"Found output '{output}' in relay pins");
-         var targetPinConfig = _relayOutputPins[output].Config;
-         foreach (var entry in _relayOutputPins)
-         {
-            var pin = entry.Value.Pin;
-            var config = entry.Value.Config;
-            if (entry.Key == output)
-            {
-               var writeValue = targetPinConfig.ActiveLow ? PinValue.Low : PinValue.High;
-               Console.WriteLine($"Writing {writeValue} to pin {config.RelayPin} for active output '{entry.Key}'");
-               pin.Write(writeValue);
-               MockGpioDriver.UpdatePinState(config.RelayPin, writeValue);
-            }
-            else
-            {
-               var writeValue = config.ActiveLow ? PinValue.High : PinValue.Low;
-               Console.WriteLine($"Writing {writeValue} to pin {config.RelayPin} for inactive output '{entry.Key}'");
-               pin.Write(writeValue);
-               MockGpioDriver.UpdatePinState(config.RelayPin, writeValue);
-            }
-         }
+         Console.WriteLine("EnableOutput: no driver registered for this source");
+         return;
       }
-      else
+
+      if (!_outputs.ContainsKey(output))
       {
-         Console.WriteLine($"Output '{output}' NOT found in relay pins");
+         Console.WriteLine($"Output '{output}' NOT found in relay outputs");
+         return;
+      }
+
+      foreach (var entry in _outputs)
+      {
+         var config = entry.Value;
+         var energized = entry.Key == output;
+         Console.WriteLine($"Setting channel {config.RelayPin} {(energized ? "ON" : "OFF")} for output '{entry.Key}'");
+         _driver.SetRelay(config.RelayPin, energized);
       }
    }
 
    public void DisableOutput()
    {
       Console.WriteLine($"DisableOutput called for source '{_sourceName}'");
-      Console.WriteLine($"Available outputs: {string.Join(", ", _relayOutputPins.Keys)}");
-      
-      foreach (var entry in _relayOutputPins)
+      if (_driver == null) return;
+
+      foreach (var entry in _outputs)
       {
-         var pin = entry.Value.Pin;
-         var config = entry.Value.Config;
-         var writeValue = config.ActiveLow ? PinValue.High : PinValue.Low;
-         Console.WriteLine($"Writing {writeValue} to pin {config.RelayPin} for disabled output '{entry.Key}'");
-         pin.Write(writeValue);
-         MockGpioDriver.UpdatePinState(config.RelayPin, writeValue);
+         var config = entry.Value;
+         Console.WriteLine($"Setting channel {config.RelayPin} OFF for output '{entry.Key}'");
+         _driver.SetRelay(config.RelayPin, false);
       }
    }
 
    public string GetCurrentRoute()
    {
-      var activeOutput = _relayOutputPins.FirstOrDefault(x => x.Value.Pin.Read() == (x.Value.Config.ActiveLow ? PinValue.Low : PinValue.High));
-      return activeOutput.Key ?? string.Empty;
+      if (_driver == null) return string.Empty;
+
+      foreach (var entry in _outputs)
+      {
+         if (_driver.GetRelay(entry.Value.RelayPin))
+         {
+            return entry.Key;
+         }
+      }
+      return string.Empty;
    }
 }

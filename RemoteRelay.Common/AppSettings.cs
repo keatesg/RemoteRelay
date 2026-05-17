@@ -29,6 +29,11 @@ public class PhysicalButtonConfig
     public PinEventTypes GetTriggerEventType() => _triggerState.Equals("Low", StringComparison.OrdinalIgnoreCase) ? PinEventTypes.Falling : PinEventTypes.Rising;
 }
 
+public class K8090Settings
+{
+    public string Port { get; set; } = string.Empty;
+}
+
 public class InactiveRelaySettings
 {
     public int Pin { get; set; }
@@ -79,6 +84,8 @@ public struct AppSettings
     public bool Logging { get; set; }
     public string LogoFile { get; set; }
     public bool UseMockGpio { get; set; }
+    public string? RelayDriver { get; set; } // "Auto" | "Mock" | "RpiGpio" | "K8090"; null/Auto preserves legacy behaviour
+    public K8090Settings? K8090 { get; set; }
     public string ThemePalette { get; set; }
 
     // Parameterless constructor for struct initialization
