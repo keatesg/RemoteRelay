@@ -36,6 +36,10 @@ The server is configured using the `config.json` file located in the same direct
       "TriggerState": "Low"
     }
   },
+  "SourceColorPalette": {
+    "Input 1": "#FFB85C38",
+    "Input 2": "#FF2E8B57"
+  },
   "ServerPort": 33101,
   "TcpMirrorAddress": null,
   "TcpMirrorPort": null,
@@ -110,6 +114,7 @@ Specifies which output each source should default to when selected. Useful for m
 - Keys are source names
 - Values are output names
 - When a source is selected without specifying an output, it routes to the defined default
+- Physical button presses also prefer the matching default route when one is configured
 - Ignored if `DefaultSource` is set
 
 ### PhysicalSourceButtons (Optional)
@@ -135,6 +140,23 @@ Configures physical hardware buttons connected to GPIO pins that can trigger sou
 - `TriggerState` (string): When the button is considered pressed
   - `"Low"`: Button press pulls pin LOW (common with pull-up resistors)
   - `"High"`: Button press pulls pin HIGH (common with pull-down resistors)
+
+The setup screen includes a `Test Switch` button for each source. That button simulates the saved switch path for the source and is useful for verifying routing logic and client updates. It does not validate the electrical GPIO input itself, so wiring and trigger polarity still need to be checked on hardware.
+
+### SourceColorPalette (Optional)
+
+Overrides the automatically generated source colours used by the client UI.
+
+```json
+"SourceColorPalette": {
+  "Input 1": "#FFB85C38",
+  "Input 2": "#FF2E8B57"
+}
+```
+
+- Keys are source names
+- Values are any Avalonia-compatible colour string, such as `#RRGGBB`, `#AARRGGBB`, or a named colour
+- These colours are now used consistently for active and linked source states in both single-output and multi-output client views
 
 ### ServerPort (Required)
 

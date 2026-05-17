@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Windows.Input;
+using Avalonia.Media;
 using ReactiveUI;
 using RemoteRelay.Common;
 
@@ -317,6 +319,9 @@ public class SetupViewModel : ViewModelBase
             .GroupBy(r => r.SourceName)
             .OrderBy(g => g.Key);
 
+        // Build a palette without any custom overrides so we can show the auto colour each source would get.
+        var autoPalette = BuildAutoPalette(settings);
+
         Inputs.Clear();
         foreach (var group in sourceGroups)
         {
@@ -326,7 +331,8 @@ public class SetupViewModel : ViewModelBase
                 customColor = color;
             }
 
-            var inputVm = new InputConfigViewModel(group.Key, customColor, DeleteInput);
+            var autoColour = autoPalette.TryGetValue(group.Key, out var auto) ? auto : Colors.LightGray;
+            var inputVm = new InputConfigViewModel(group.Key, customColor, autoColour, DeleteInput, SetStatusMessage);
 
             // Add physical button config if exists
             if (settings.PhysicalSourceButtons?.TryGetValue(group.Key, out var buttonConfig) == true)
@@ -387,10 +393,17 @@ public class SetupViewModel : ViewModelBase
     private void AddInput()
     {
         var newName = $"Input {Inputs.Count + 1}";
-        var inputVm = new InputConfigViewModel(newName, string.Empty, DeleteInput);
+        var inputVm = new InputConfigViewModel(newName, string.Empty, Colors.LightGray, DeleteInput, SetStatusMessage);
         Inputs.Add(inputVm);
         DefaultRoutes.Add(new DefaultRouteViewModel(newName, "None"));
         UpdateAvailableOutputsForDefaultRoutes();
+    }
+
+    private static Dictionary<string, Color> BuildAutoPalette(AppSettings settings)
+    {
+        var stripped = settings;
+        stripped.SourceColorPalette = new Dictionary<string, string>();
+        return SourcePaletteBuilder.Build(stripped);
     }
 
     private void DeleteInput(InputConfigViewModel input)
@@ -516,5 +529,10 @@ public class SetupViewModel : ViewModelBase
         }
 
         return settings;
+    }
+
+    private void SetStatusMessage(string message)
+    {
+        StatusMessage = message;
     }
 }

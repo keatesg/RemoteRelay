@@ -1,9 +1,8 @@
 using System;
 using System.Reactive;
-using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using System.Threading;
+using Avalonia;
 using Avalonia.Media;
 using Avalonia.Threading;
 using ReactiveUI;
@@ -13,14 +12,19 @@ namespace RemoteRelay.Controls;
 public class SourceButtonViewModel : ViewModelBase
 {
     private readonly BehaviorSubject<SourceState> _state = new(SourceState.Inactive);
+    private readonly bool _hasIdentityColour;
+    private readonly bool _isOutputDestination;
     private SolidColorBrush _backgroundColor = new(Colors.DarkSlateBlue);
     private SolidColorBrush _foregroundColor = new(Colors.White);
     private Color _linkedColor = Colors.Gray;
     private bool _isEnabled = true;
 
-    public SourceButtonViewModel(string sourceName)
+    public SourceButtonViewModel(string sourceName, Color? linkedColor = null, bool isOutputDestination = false)
     {
         SourceName = sourceName;
+        _hasIdentityColour = linkedColor.HasValue;
+        _isOutputDestination = isOutputDestination;
+        _linkedColor = linkedColor ?? Colors.Gray;
 
         var canExecute = _state
            .Select(state => state != SourceState.Selected)
@@ -39,18 +43,35 @@ public class SourceButtonViewModel : ViewModelBase
            {
                if (!tuple.enabled)
                {
-                   return (Background: Colors.DarkSlateGray, Foreground: Colors.DimGray);
+                   var disabledBg = LookupBrushColor("SourceDisabledBrush", Colors.DarkSlateGray);
+                   var disabledFg = LookupBrushColor("SourceDisabledForegroundBrush", Colors.DimGray);
+                   return (Background: disabledBg, Foreground: disabledFg);
+               }
+
+               if (tuple.state == SourceState.Inactive && !_hasIdentityColour)
+               {
+                   if (_isOutputDestination)
+                   {
+                       // Output button with nothing routed: distinctly idle.
+                       var idleBg = LookupBrushColor("OutputNeutralBrush", Color.FromRgb(0x32, 0x37, 0x44));
+                       var idleFg = LookupBrushColor("OutputNeutralForegroundBrush", Color.FromRgb(0x8A, 0x8E, 0x96));
+                       return (Background: idleBg, Foreground: idleFg);
+                   }
+
+                   // Action button (Cancel, Confirm, Unroute) – keep the normal neutral look.
+                   var actionBg = LookupBrushColor("ActionButtonBrush", Colors.DarkSlateBlue);
+                   return (Background: actionBg, Foreground: SourcePaletteBuilder.GetReadableForeground(actionBg));
                }
 
                var bg = tuple.state switch
                {
-                   SourceState.Inactive => Colors.DarkSlateBlue,
-                   SourceState.Selected => Colors.Red,
-                   SourceState.Active => Colors.Red,
+                   SourceState.Inactive => SourcePaletteBuilder.Dim(_linkedColor),
+                   SourceState.Selected => LookupBrushColor("SourceSelectedFlashBrush", Colors.Red),
+                   SourceState.Active => _linkedColor,
                    SourceState.Linked => _linkedColor,
                    _ => Colors.Pink
                };
-               return (Background: bg, Foreground: Colors.White);
+               return (Background: bg, Foreground: SourcePaletteBuilder.GetReadableForeground(bg));
            })
            .ObserveOn(RxApp.MainThreadScheduler)
            .Subscribe(x =>
@@ -58,7 +79,6 @@ public class SourceButtonViewModel : ViewModelBase
                BackgroundColor = new SolidColorBrush(x.Background);
                ForegroundColor = new SolidColorBrush(x.Foreground);
            });
-        ;
     }
 
     public string SourceName { get; }
@@ -100,7 +120,7 @@ public class SourceButtonViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Start a flash animation that alternates between the linked color and a highlight color.
+    /// Start a flash animation that alternates between the supplied colour and a neutral off-colour.
     /// Used when FlashOnSelect is enabled and an input is selected.
     /// </summary>
     public void StartFlashAnimation(Color flashColor)
@@ -111,6 +131,9 @@ public class SourceButtonViewModel : ViewModelBase
         const int flashCount = 6;
         const int flashIntervalMs = 150;
 
+        var flashOff = LookupBrushColor("SourceFlashOffBrush", Colors.DarkGray);
+        var selectedSettle = LookupBrushColor("SourceSelectedFlashBrush", Colors.Red);
+
         _flashDisposable = Observable
            .Interval(TimeSpan.FromMilliseconds(flashIntervalMs))
            .Take(flashCount)
@@ -118,15 +141,33 @@ public class SourceButtonViewModel : ViewModelBase
            .Subscribe(
               tick =>
               {
-                // Alternate between flash color and dark/transparent
-                var isOn = tick % 2 == 0;
-                  BackgroundColor = new SolidColorBrush(isOn ? flashColor : Colors.DarkGray);
+                  var isOn = tick % 2 == 0;
+                  var background = isOn ? flashColor : flashOff;
+                  BackgroundColor = new SolidColorBrush(background);
+                  ForegroundColor = new SolidColorBrush(SourcePaletteBuilder.GetReadableForeground(background));
               },
               () =>
               {
-                // Animation complete - restore to Selected state color (Red)
-                BackgroundColor = new SolidColorBrush(Colors.Red);
+                  BackgroundColor = new SolidColorBrush(selectedSettle);
+                  ForegroundColor = new SolidColorBrush(SourcePaletteBuilder.GetReadableForeground(selectedSettle));
               });
+    }
+
+    private static Color LookupBrushColor(string key, Color fallback)
+    {
+        var app = Application.Current;
+        if (app is null)
+        {
+            return fallback;
+        }
+
+        if (app.Resources.TryGetResource(key, app.ActualThemeVariant, out var resource) &&
+            resource is ISolidColorBrush brush)
+        {
+            return brush.Color;
+        }
+
+        return fallback;
     }
 }
 

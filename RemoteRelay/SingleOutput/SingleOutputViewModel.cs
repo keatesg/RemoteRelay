@@ -13,10 +13,16 @@ namespace RemoteRelay.SingleOutput;
 
 public class SingleOutputViewModel : OperationViewModelBase
 {
+    private readonly Dictionary<string, Color> _palette;
+
     public SingleOutputViewModel(AppSettings settings, bool? showIpOverride = null)
        : base(settings, showIpOverride)
     {
-        Inputs = settings.Sources.Select(x => new SourceButtonViewModel(x)).ToArray();
+        _palette = SourcePaletteBuilder.Build(settings);
+        Output = new SourceButtonViewModel("Confirm");
+        Inputs = settings.Sources
+            .Select(source => new SourceButtonViewModel(source, ResolveColour(source)))
+            .ToArray();
 
         var cancelRequested =
            Observable.Merge(CancelStream,
@@ -48,11 +54,12 @@ public class SingleOutputViewModel : OperationViewModelBase
             x?.SetState(SourceState.Selected);
             if (x is null) return;
 
+            var selectedInput = x;
+
             // Flash the selected input if FlashOnSelect is enabled
             if (FlashOnSelect)
             {
-                // Use a bright orange color for single output mode
-                x.StartFlashAnimation(Colors.Orange);
+                selectedInput.StartFlashAnimation(ResolveColour(selectedInput.SourceName));
             }
 
             PushStatusMessage(
@@ -135,7 +142,7 @@ public class SingleOutputViewModel : OperationViewModelBase
 
     public IEnumerable<SourceButtonViewModel> Inputs { get; }
 
-    public SourceButtonViewModel Output { get; } = new("Confirm");
+    public SourceButtonViewModel Output { get; }
 
     public SourceButtonViewModel OffButton { get; }
 
@@ -155,7 +162,7 @@ public class SingleOutputViewModel : OperationViewModelBase
                 if (!string.IsNullOrEmpty(pair.Value))
                 {
                     Debug.WriteLine($"{pair.Key} is active");
-                    input.SetState(SourceState.Active);
+                    input.SetState(SourceState.Active, ResolveColour(pair.Key));
                     activeRoutes.Add($"{pair.Key} routed to {pair.Value}");
                 }
                 // Set all others to inactive
@@ -180,5 +187,10 @@ public class SingleOutputViewModel : OperationViewModelBase
         {
             PushStatusMessage("No active routes");
         }
+    }
+
+    private Color ResolveColour(string sourceName)
+    {
+        return SourcePaletteBuilder.Resolve(sourceName, _palette, Settings.ThemePalette);
     }
 }

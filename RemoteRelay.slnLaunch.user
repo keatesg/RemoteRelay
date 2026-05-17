@@ -9,7 +9,7 @@
       },
       {
         "Path": "RemoteRelay.Server\\RemoteRelay.Server.csproj",
-        "Action": "StartWithoutDebugging",
+        "Action": "Start",
         "DebugTarget": "http"
       }
     ]

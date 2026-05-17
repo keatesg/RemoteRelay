@@ -1,0 +1,14 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <SolidColorBrush x:Key="SourceDisabledBrush" Color="DarkSlateGray" />
+    <SolidColorBrush x:Key="SourceDisabledForegroundBrush" Color="DimGray" />
+    <SolidColorBrush x:Key="SourceSelectedFlashBrush" Color="Red" />
+    <SolidColorBrush x:Key="SourceFlashOffBrush" Color="DarkGray" />
+    <!-- Background for an output button when nothing is routed through it. -->
+    <SolidColorBrush x:Key="OutputNeutralBrush" Color="#323744" />
+    <SolidColorBrush x:Key="OutputNeutralForegroundBrush" Color="#8A8E96" />
+    <!-- Background for action buttons (Cancel, Confirm, Unroute) – not tied to source identity. -->
+    <SolidColorBrush x:Key="ActionButtonBrush" Color="DarkSlateBlue" />
+
+</ResourceDictionary>

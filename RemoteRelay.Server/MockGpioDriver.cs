@@ -31,7 +31,7 @@ public class MockGpioDriver : GpioDriver
         }
     }
 
-    protected override int ConvertPinNumberToLogicalNumberingScheme(int pinNumber)
+    protected int ConvertPinNumberToLogicalNumberingScheme(int pinNumber)
     {
         Console.WriteLine($"Converting pin {pinNumber} to logical numbering scheme");
         return pinNumber;

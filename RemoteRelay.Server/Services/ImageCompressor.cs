@@ -2,10 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 
 namespace RemoteRelay.Server.Services;
 
@@ -16,57 +13,43 @@ public static class ImageCompressor
 
     public static async Task<(byte[] Data, string ContentType)> LoadAndCompressAsync(string path, CancellationToken cancellationToken = default)
     {
-    await using var stream = File.OpenRead(path);
-        using var image = await Image.LoadAsync<Rgba32>(stream, cancellationToken).ConfigureAwait(false);
+        await using var fileStream = File.OpenRead(path);
+        using var buffered = new MemoryStream();
+        await fileStream.CopyToAsync(buffered, cancellationToken).ConfigureAwait(false);
+        buffered.Position = 0;
 
-        ResizeIfNecessary(image);
-        FlattenTransparency(image);
+        using var decoded = SKBitmap.Decode(buffered)
+            ?? throw new InvalidDataException($"Could not decode image: {path}");
 
-        await using var output = new MemoryStream();
-        var encoder = new JpegEncoder { Quality = JpegQuality };
-        await image.SaveAsJpegAsync(output, encoder, cancellationToken).ConfigureAwait(false);
-        return (output.ToArray(), "image/jpeg");
-    }
+        var (width, height) = ScaledSize(decoded.Width, decoded.Height);
 
-    private static void ResizeIfNecessary(Image image)
-    {
-        var largestDimension = Math.Max(image.Width, image.Height);
-        if (largestDimension <= MaxDimension)
+        var info = new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Opaque);
+        using var output = new SKBitmap(info);
+        using (var canvas = new SKCanvas(output))
+        using (var sourceImage = SKImage.FromBitmap(decoded))
         {
-            return;
+            canvas.Clear(SKColors.White);
+            var destination = new SKRect(0, 0, width, height);
+            var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
+            canvas.DrawImage(sourceImage, destination, sampling);
         }
 
-        var scale = MaxDimension / (double)largestDimension;
-        var newWidth = (int)Math.Round(image.Width * scale);
-        var newHeight = (int)Math.Round(image.Height * scale);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        image.Mutate(ctx => ctx.Resize(newWidth, newHeight));
+        using var image = SKImage.FromBitmap(output);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, JpegQuality);
+        return (data.ToArray(), "image/jpeg");
     }
 
-    private static void FlattenTransparency(Image<Rgba32> image)
+    private static (int Width, int Height) ScaledSize(int width, int height)
     {
-        image.ProcessPixelRows(accessor =>
+        var largest = Math.Max(width, height);
+        if (largest <= MaxDimension)
         {
-            for (var y = 0; y < accessor.Height; y++)
-            {
-                var row = accessor.GetRowSpan(y);
-                for (var x = 0; x < row.Length; x++)
-                {
-                    ref var pixel = ref row[x];
-                    if (pixel.A == byte.MaxValue)
-                    {
-                        continue;
-                    }
+            return (width, height);
+        }
 
-                    var alpha = pixel.A / 255f;
-                    var inverse = 1f - alpha;
-
-                    pixel.R = (byte)Math.Clamp(pixel.R * alpha + 255f * inverse, 0f, 255f);
-                    pixel.G = (byte)Math.Clamp(pixel.G * alpha + 255f * inverse, 0f, 255f);
-                    pixel.B = (byte)Math.Clamp(pixel.B * alpha + 255f * inverse, 0f, 255f);
-                    pixel.A = byte.MaxValue;
-                }
-            }
-        });
+        var scale = MaxDimension / (double)largest;
+        return ((int)Math.Round(width * scale), (int)Math.Round(height * scale));
     }
 }

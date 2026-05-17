@@ -157,7 +157,7 @@
                                             <ComboBoxItem Content="Low"/>
                                             <ComboBoxItem Content="High"/>
                                         </ComboBox>
-                                        <Button Content="Test" Command="{Binding TestPhysicalButtonCommand}" Classes="test-btn"/>
+                                        <Button Content="Test Switch" Command="{Binding TestPhysicalButtonCommand}" Classes="test-btn"/>
                                     </StackPanel>
 
                                     <!-- Add Output Button -->

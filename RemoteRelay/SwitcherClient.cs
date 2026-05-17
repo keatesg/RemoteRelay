@@ -244,6 +244,25 @@ public class SwitcherClient
         }
     }
 
+    public async Task<string?> TestPhysicalButtonAsync(string sourceName)
+    {
+        if (!IsConnected)
+        {
+            System.Diagnostics.Debug.WriteLine("Cannot test physical button: connection is not active");
+            return "Not connected to server";
+        }
+
+        try
+        {
+            return await _connection.InvokeAsync<string?>("TestPhysicalButton", sourceName);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error sending TestPhysicalButton command: {ex.Message}");
+            return ex.Message;
+        }
+    }
+
     /// <summary>
     /// Saves the provided configuration to the server.
     /// </summary>

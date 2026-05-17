@@ -21,6 +21,7 @@ Multiple clients can connect simultaneously, with all state changes synchronized
 - Optional inactive relay for fail-safe backup routing
 - Touch-optimized interface suitable for studio control panels
 - Customizable UI filtering per client
+- Per-source custom colours
 
 ## Installation
 

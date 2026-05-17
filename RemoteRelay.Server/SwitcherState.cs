@@ -251,6 +251,27 @@ public class SwitcherState : IDisposable
         }
     }
 
+    public string? TestPhysicalButton(string sourceName)
+    {
+        if (string.IsNullOrWhiteSpace(sourceName))
+        {
+            return "Source name is required.";
+        }
+
+        lock (_stateLock)
+        {
+            var targetOutputName = ResolvePhysicalButtonTargetOutput(sourceName);
+            if (string.IsNullOrWhiteSpace(targetOutputName))
+            {
+                return $"No route found for source '{sourceName}'.";
+            }
+
+            SwitchSource(sourceName, targetOutputName);
+            Console.WriteLine($"Simulated physical button press for source '{sourceName}' to output '{targetOutputName}'.");
+            return null;
+        }
+    }
+
     public void Dispose()
     {
         lock (_stateLock)
@@ -488,7 +509,7 @@ public class SwitcherState : IDisposable
             string? targetOutputName;
             lock (_stateLock)
             {
-                targetOutputName = _settings.Routes.FirstOrDefault(r => r.SourceName == sourceName)?.OutputName;
+                targetOutputName = ResolvePhysicalButtonTargetOutput(sourceName);
             }
 
             if (targetOutputName == null)
@@ -506,6 +527,27 @@ public class SwitcherState : IDisposable
         {
             Console.WriteLine($"Pin event {e.ChangeType} for pin {e.PinNumber} (source '{sourceName}') was not the configured trigger event type ({buttonConfig.GetTriggerEventType()}).");
         }
+    }
+
+    private string? ResolvePhysicalButtonTargetOutput(string sourceName)
+    {
+        if (_settings.DefaultRoutes != null)
+        {
+            var defaultRoute = _settings.DefaultRoutes.FirstOrDefault(route =>
+                string.Equals(route.Key, sourceName, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(defaultRoute.Value) &&
+                _settings.Routes.Any(route =>
+                    string.Equals(route.SourceName, sourceName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(route.OutputName, defaultRoute.Value, StringComparison.OrdinalIgnoreCase)))
+            {
+                return defaultRoute.Value;
+            }
+        }
+
+        return _settings.Routes
+            .FirstOrDefault(route => string.Equals(route.SourceName, sourceName, StringComparison.OrdinalIgnoreCase))
+            ?.OutputName;
     }
 
     private Dictionary<string, string> GetSystemStateInternal()

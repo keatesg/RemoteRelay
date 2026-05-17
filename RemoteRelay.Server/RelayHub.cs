@@ -62,6 +62,17 @@ public class RelayHub : Hub
         _switcherState.TestPin(pin, activeLow, active);
     }
 
+    public async Task<string?> TestPhysicalButton(string sourceName)
+    {
+        var error = _switcherState.TestPhysicalButton(sourceName);
+        if (error == null)
+        {
+            await GetSystemState();
+        }
+
+        return error;
+    }
+
     /// <summary>
     /// Saves the provided configuration to the server's config.json file.
     /// </summary>
@@ -69,6 +80,15 @@ public class RelayHub : Hub
     public async Task<SaveConfigurationResponse> SaveConfiguration(AppSettings settings)
     {
         var (success, error) = await _configurationService.SaveAsync(settings);
+        if (success)
+        {
+            // Apply to the running server's in-memory state and push to every connected client.
+            // Without this the ConfigurationWatcher will eventually catch up, but the caller's immediate
+            // RequestSettings() can race against the file watcher and pull back the previous settings.
+            await _switcherState.ApplySettingsAsync(settings);
+            await Clients.All.SendAsync("Configuration", _switcherState.GetSettings());
+        }
+
         return new SaveConfigurationResponse
         {
             Success = success,

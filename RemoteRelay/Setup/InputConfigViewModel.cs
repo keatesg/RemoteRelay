@@ -12,6 +12,7 @@ namespace RemoteRelay.Setup;
 public class InputConfigViewModel : ViewModelBase
 {
     private readonly Action<InputConfigViewModel> _deleteAction;
+    private readonly Action<string>? _statusReporter;
 
     private string _sourceName = string.Empty;
     public string SourceName
@@ -19,6 +20,8 @@ public class InputConfigViewModel : ViewModelBase
         get => _sourceName;
         set => this.RaiseAndSetIfChanged(ref _sourceName, value);
     }
+
+    private Color _autoPaletteColour = Colors.LightGray;
 
     private Color _customColorValue = Colors.LightGray;
     public Color CustomColorValue
@@ -45,7 +48,7 @@ public class InputConfigViewModel : ViewModelBase
             }
             else
             {
-                _customColorValue = Colors.LightGray;
+                _customColorValue = _autoPaletteColour;
             }
             this.RaisePropertyChanged(nameof(CustomColorValue));
         }
@@ -72,23 +75,37 @@ public class InputConfigViewModel : ViewModelBase
     public ICommand TestPhysicalButtonCommand { get; }
     public ICommand ClearColorCommand { get; }
 
-    public InputConfigViewModel(string sourceName, string customColor, Action<InputConfigViewModel> deleteAction)
+    public InputConfigViewModel(string sourceName, string customColor, Color autoPaletteColour, Action<InputConfigViewModel> deleteAction, Action<string>? statusReporter = null)
     {
         _sourceName = sourceName;
-        _customColor = customColor;
+        _autoPaletteColour = autoPaletteColour;
         _deleteAction = deleteAction;
+        _statusReporter = statusReporter;
+
+        // Drive both _customColor and _customColorValue via the property setter so the ColorPicker reflects the saved value.
+        CustomColor = customColor;
 
         AddOutputRouteCommand = ReactiveCommand.Create(AddOutputRoute);
         DeleteInputCommand = ReactiveCommand.Create(() => _deleteAction(this));
         TestPhysicalButtonCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            if (PhysicalButtonPin > 0)
+            if (string.IsNullOrWhiteSpace(SourceName))
             {
-                // For input buttons, we typically just read state, but we can still test by toggling
-                await SwitcherClient.Instance.TestPinAsync(PhysicalButtonPin, PhysicalButtonTrigger == "Low", true);
-                await System.Threading.Tasks.Task.Delay(200);
-                await SwitcherClient.Instance.TestPinAsync(PhysicalButtonPin, PhysicalButtonTrigger == "Low", false);
+                _statusReporter?.Invoke("Enter a source name before testing the physical switch.");
+                return;
             }
+
+            if (PhysicalButtonPin <= 0)
+            {
+                _statusReporter?.Invoke($"Configure a physical button pin for {SourceName} before testing.");
+                return;
+            }
+
+            _statusReporter?.Invoke($"Testing saved switch path for {SourceName}...");
+            var error = await SwitcherClient.Instance.TestPhysicalButtonAsync(SourceName);
+            _statusReporter?.Invoke(error == null
+                ? $"Simulated physical button press for {SourceName}."
+                : $"Physical switch test failed for {SourceName}: {error}");
         });
 
         ClearColorCommand = ReactiveCommand.Create(() => CustomColor = string.Empty);
