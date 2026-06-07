@@ -1,6 +1,7 @@
 # Build and package RemoteRelay for multiple platforms
-# Server: linux-arm64 (Raspberry Pi)
+# Server: linux-arm64 (Raspberry Pi), win-x64
 # Client: win-x64, linux-x64, linux-arm64
+# Windows installer: .msi built via WiX 5
 
 name: .NET Build
 
@@ -10,6 +11,12 @@ on:
   pull_request:
     branches: [ "master" ]
   workflow_call:  # Allows this workflow to be called by other workflows
+    inputs:
+      version:
+        description: 'Release version (e.g. v1.0.0); used to stamp the MSI'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   build:
@@ -23,11 +30,31 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
+    # Stamp the assembly version from the release tag (v1.2.3 / v1.2.3-beta ->
+    # 1.2.3) so the binaries report it via `--version`. Exported as the `Version`
+    # MSBuild property for every dotnet command in this job (publishes and the
+    # makeself-bundled publishes alike). Empty input -> Directory.Build.props
+    # default.
+    - name: Set build version
+      run: |
+        V="${{ inputs.version }}"
+        if [ -n "$V" ]; then V="${V#v}"; V="${V%%-*}"; else V="1.0.0"; fi
+        echo "Version=$V" >> "$GITHUB_ENV"
+        echo "Building version $V"
+
+    # Restore/build only the cross-platform .NET 10 projects. The WiX installer
+    # and its DTF custom-action assembly target net472 and are built on Windows.
     - name: Restore dependencies
-      run: dotnet restore
+      run: |
+        dotnet restore RemoteRelay.Common/RemoteRelay.Common.csproj
+        dotnet restore RemoteRelay/RemoteRelay.csproj
+        dotnet restore RemoteRelay.Server/RemoteRelay.Server.csproj
 
     - name: Build
-      run: dotnet build --no-restore --configuration Release
+      run: |
+        dotnet build RemoteRelay.Common/RemoteRelay.Common.csproj --no-restore --configuration Release
+        dotnet build RemoteRelay/RemoteRelay.csproj --no-restore --configuration Release
+        dotnet build RemoteRelay.Server/RemoteRelay.Server.csproj --no-restore --configuration Release
 
     # ======== Server Build (linux-arm64 only) ========
     - name: Publish Server - linux-arm64
@@ -128,12 +155,15 @@ jobs:
     - name: Create makeself installers
       run: |
         chmod +x create_makeself_installer.sh
-        
-        # Generate for linux-arm64
+
+        # Generate for linux-arm64 (Raspberry Pi 64-bit)
         ./create_makeself_installer.sh linux-arm64
-        
-        # Generate for linux-arm
+
+        # Generate for linux-arm (Raspberry Pi 32-bit)
         ./create_makeself_installer.sh linux-arm
+
+        # Generate for linux-x64 (PC / NUC — client, or K8090/Mock server)
+        ./create_makeself_installer.sh linux-x64
 
     - name: Upload Makeself Installer - linux-arm64
       uses: actions/upload-artifact@v4
@@ -146,3 +176,84 @@ jobs:
       with:
         name: RemoteRelay-Installer-linux-arm
         path: ./remote-relay-installer-linux-arm.sh
+
+    - name: Upload Makeself Installer - linux-x64
+      uses: actions/upload-artifact@v4
+      with:
+        name: RemoteRelay-Installer-linux-x64
+        path: ./remote-relay-installer-linux-x64.sh
+
+  # ======== Windows MSI Installer ========
+  windows-installer:
+    name: Build Windows MSI installer
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish Client (win-x64, self-contained)
+        run: >
+          dotnet publish RemoteRelay/RemoteRelay.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:PublishTrimmed=false
+          -o publish/client
+
+      - name: Publish Server (win-x64, self-contained)
+        run: >
+          dotnet publish RemoteRelay.Server/RemoteRelay.Server.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:PublishTrimmed=false
+          -o publish/server
+
+      - name: Restore CustomActions project
+        run: dotnet restore RemoteRelay.Installer.CustomActions/RemoteRelay.Installer.CustomActions.csproj
+
+      - name: Build CustomActions
+        run: >
+          dotnet build RemoteRelay.Installer.CustomActions/RemoteRelay.Installer.CustomActions.csproj
+          --configuration Release
+          --no-restore
+
+      - name: Restore Installer project
+        run: dotnet restore RemoteRelay.Installer/RemoteRelay.Installer.wixproj
+
+      # Turn the release tag (e.g. v1.2.3 or v1.2.3-beta) into a numeric MSI
+      # ProductVersion (1.2.3). Empty on push/PR builds -> wixproj default.
+      - name: Compute MSI version
+        id: msiver
+        shell: pwsh
+        run: |
+          $v = "${{ inputs.version }}"
+          if ($v) {
+            $v = $v -replace '^v', ''
+            $v = ($v -split '-')[0]
+          } else {
+            $v = '1.0.0'
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Build MSI
+        run: >
+          dotnet build RemoteRelay.Installer/RemoteRelay.Installer.wixproj
+          --configuration Release
+          --no-restore
+          -p:PublishClientDir=${{ github.workspace }}\publish\client
+          -p:PublishServerDir=${{ github.workspace }}\publish\server
+          -p:BuildVersion=${{ steps.msiver.outputs.version }}
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: RemoteRelay-Installer-windows
+          path: RemoteRelay.Installer/bin/Release/**/RemoteRelay-Setup.msi

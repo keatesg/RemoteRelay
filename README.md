@@ -25,26 +25,62 @@ Multiple clients can connect simultaneously, with all state changes synchronized
 
 ## Installation
 
-### Recommended: Automated Installer (Raspberry Pi)
+### Recommended: One-line install (Raspberry Pi / Linux)
 
-The easiest way to install RemoteRelay on a Raspberry Pi:
+Open a terminal on the Pi and run:
 
-1. **Download the installer:**
-   ```bash
-   wget https://github.com/yourusername/RemoteRelay/releases/latest/download/remote-relay-installer.sh
-   ```
+```bash
+curl -fsSL https://raw.githubusercontent.com/keatesg/RemoteRelay/master/get.sh | sudo bash
+```
 
-2. **Make it executable:**
-   ```bash
-   chmod +x remote-relay-installer.sh
-   ```
+That's it. The bootstrap detects your architecture, downloads the matching
+build, and launches a friendly installer that walks you through setting up the
+Server, Client, or both — including auto-start services and (optionally) kiosk
+display settings.
 
-3. **Run the installer:**
-   ```bash
-   sudo ./remote-relay-installer.sh
-   ```
+Variations:
 
-The installer will guide you through setting up the Server, Client, or both, and configure automatic startup services.
+```bash
+# Install the latest pre-release
+curl -fsSL https://raw.githubusercontent.com/keatesg/RemoteRelay/master/get.sh | sudo bash -s -- --pre-release
+
+# Fully unattended (no prompts; sensible defaults)
+curl -fsSL https://raw.githubusercontent.com/keatesg/RemoteRelay/master/get.sh | sudo bash -s -- --unattended
+
+# Only one component
+curl -fsSL https://raw.githubusercontent.com/keatesg/RemoteRelay/master/get.sh | sudo bash -s -- --server-only
+```
+
+### Managing an installation
+
+After installing, manage everything from one place:
+
+```bash
+sudo remoterelay
+```
+
+This opens a menu to check status, start/stop the server, update, view logs,
+uninstall, and configure the options that aren't set from the client app
+(relay driver, K8090 serial port, default source, client connection, kiosk
+display, NTP). The same actions are available non-interactively, e.g.
+`sudo remoterelay status`, `sudo remoterelay restart`, `sudo remoterelay update`.
+
+See **[Linux Installer & Management](docs/Linux_Installer.md)** for details.
+
+### Manual install / offline
+
+Each release also attaches self-extracting installers
+(`RemoteRelay-Installer-linux-arm64.sh`, `RemoteRelay-Installer-linux-arm.sh`,
+`RemoteRelay-Installer-linux-x64.sh`) for offline use:
+
+```bash
+chmod +x RemoteRelay-Installer-linux-arm64.sh
+sudo ./RemoteRelay-Installer-linux-arm64.sh
+```
+
+### Windows
+
+A Windows MSI installer (`RemoteRelay-Setup.msi`) is attached to each GitHub Release. It lets you install the Client, Server, or both via a feature-selection wizard, captures the basic configuration each component needs, and registers the Server as an auto-starting Windows Service. See [Windows Installer](docs/Windows_Installer.md) for details.
 
 
 ## Configuration
@@ -61,6 +97,8 @@ Detailed configuration guides and feature documentation:
 - **[Server Configuration](docs/Server_Configuration.md)** - GPIO pins, routing tables, physical buttons, and server options
 - **[Client Configuration](docs/Client_Configuration.md)** - Server connection and UI filtering
 - **[Inactive Relay Feature](docs/Inactive_Relay.md)** - Fail-safe relay for backup routing when the system is offline
+- **[Linux Installer & Management](docs/Linux_Installer.md)** - One-line install, the `remoterelay` tool, and unattended options
+- **[Windows Installer](docs/Windows_Installer.md)** - WiX-based MSI for Windows installs
 
 ## License
 

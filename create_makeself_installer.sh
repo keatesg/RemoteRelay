@@ -158,6 +158,28 @@ else
     echo "Warning: Update script '${UPDATE_SCRIPT_SOURCE}' not found."
 fi
 
+echo "  Copying shared UI libraries (lib/)..."
+mkdir -p "${MAKSELF_STAGE_DIR}/lib"
+for libf in rr-ui.sh rr-common.sh; do
+    if [ -f "lib/${libf}" ]; then
+        cp "lib/${libf}" "${MAKSELF_STAGE_DIR}/lib/${libf}"
+        sed -i 's/\r$//' "${MAKSELF_STAGE_DIR}/lib/${libf}"
+        dos2unix "${MAKSELF_STAGE_DIR}/lib/${libf}" 2>/dev/null || true
+    else
+        echo "Warning: lib/${libf} not found — management tool will not work."
+    fi
+done
+
+echo "  Copying management tool (remoterelay.sh)..."
+if [ -f "remoterelay.sh" ]; then
+    cp "remoterelay.sh" "${MAKSELF_STAGE_DIR}/remoterelay.sh"
+    sed -i 's/\r$//' "${MAKSELF_STAGE_DIR}/remoterelay.sh"
+    dos2unix "${MAKSELF_STAGE_DIR}/remoterelay.sh" 2>/dev/null || true
+    chmod +x "${MAKSELF_STAGE_DIR}/remoterelay.sh"
+else
+    echo "Warning: remoterelay.sh not found — management tool will not be installed."
+fi
+
 # Verify the install script is properly formatted
 echo "  Verifying install script..."
 if ! head -1 "${MAKSELF_STAGE_DIR}/${STARTUP_SCRIPT_DEST_IN_ARCHIVE}" | grep -q "#!/bin/bash"; then

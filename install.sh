@@ -3,14 +3,54 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-INSTALLER_VERSION="1.0.0"
+INSTALLER_VERSION="2.0.0"
 
-# Display version for support purposes
-echo "RemoteRelay Installer v${INSTALLER_VERSION}"
-echo ""
+# Load the shared UI + helper libraries bundled alongside this script in the
+# installer payload. Fall back to minimal shims if they are missing so the
+# installer still works.
+RR_LIBDIR=""
+for _libdir in "$SCRIPT_DIR/lib" "$SCRIPT_DIR"; do
+  if [ -f "$_libdir/rr-ui.sh" ] && [ -f "$_libdir/rr-common.sh" ]; then RR_LIBDIR="$_libdir"; break; fi
+done
+if [ -n "$RR_LIBDIR" ]; then
+  # shellcheck source=lib/rr-ui.sh
+  . "$RR_LIBDIR/rr-ui.sh"
+  # shellcheck source=lib/rr-common.sh
+  . "$RR_LIBDIR/rr-common.sh"
+else
+  echo "Warning: UI helpers not found; using minimal output." >&2
+  ui_header(){ echo; echo "== $1 =="; }; ui_step(){ echo "> $1"; }
+  ui_info(){ echo "  $1"; }; ui_ok(){ echo "  [ok] $1"; }
+  ui_warn(){ echo "  [warn] $1" >&2; }; ui_error(){ echo "  [error] $1" >&2; }
+  ui_msgbox(){ echo; echo "$1"; echo "$2"; }
+  ui_yesno(){ return 0; }; ui_inputbox(){ printf '%s' "${3:-}"; }
+  ui_menu(){ printf '%s' "${3:-}"; }; ui_checklist(){ printf '%s' ""; }
+  RR_INTERACTIVE=0; RR_HAS_WHIPTAIL=0
+  RR_GITHUB_REPO="${RR_GITHUB_REPO:-keatesg/RemoteRelay}"
+fi
+RR_BACKTITLE="RemoteRelay installer"
+
+# Flags forwarded from get.sh / update.sh.
+FORCE_SERVER=""; FORCE_CLIENT=""; CHANNEL="stable"
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --unattended)  export RR_UNATTENDED=1 ;;
+    --server-only) FORCE_SERVER=1; FORCE_CLIENT=0 ;;
+    --client-only) FORCE_CLIENT=1; FORCE_SERVER=0 ;;
+    --pre-release) CHANNEL="pre" ;;   # recorded for the updater; no effect here
+    *) ui_warn "Ignoring unknown option: $1" ;;
+  esac
+  shift
+done
+
+# --unattended may have arrived as a flag after rr-ui.sh already computed
+# interactivity, so reconcile it here.
+[ "${RR_UNATTENDED:-0}" = 1 ] && RR_INTERACTIVE=0
+
+ui_header "RemoteRelay installer v${INSTALLER_VERSION}"
 
 if [ "$EUID" -ne 0 ]; then
-  echo "Error: This installer must be run as root (sudo)." >&2
+  ui_error "This installer must be run as root (sudo)."
   exit 1
 fi
 
@@ -121,18 +161,10 @@ SUMMARY=()
 bold() { printf "\033[1m%s\033[0m" "$1"; }
 
 prompt_yes_no() {
-  local prompt="$1"
-  local default="$2"
-  local answer
-  while true; do
-    read -r -p "$prompt" answer || answer=""
-    answer=${answer:-$default}
-    case "${answer^^}" in
-      Y|YES) return 0 ;;
-      N|NO) return 1 ;;
-    esac
-    echo "Please answer yes or no (y/n)."
-  done
+  # Compatibility shim over ui_yesno. $1 = prompt, $2 = default (Y/N).
+  local default=yes
+  [ "${2^^}" = "N" ] || [ "${2^^}" = "NO" ] && default=no
+  ui_yesno "RemoteRelay" "$1" "$default"
 }
 
 # Run architecture check now that prompt_yes_no is defined
@@ -823,12 +855,44 @@ EOF
   SUMMARY+=("NTP servers configured: $ntp_servers")
 }
 
-echo "----------------------------------------------------"
-echo "$(bold "RemoteRelay Installer")"
-echo "----------------------------------------------------"
-echo "Target user: $APP_USER"
-echo "Install root: $BASE_INSTALL_DIR"
-echo
+install_management_tool() {
+  echo "Installing management tool (remoterelay)..."
+
+  # Shared libraries to a stable system location used by the installed tool.
+  install -d /usr/local/lib/remoterelay
+  if [ -n "$RR_LIBDIR" ] && [ -f "$RR_LIBDIR/rr-ui.sh" ]; then
+    cp "$RR_LIBDIR/rr-ui.sh" "$RR_LIBDIR/rr-common.sh" /usr/local/lib/remoterelay/
+    chmod 644 /usr/local/lib/remoterelay/rr-ui.sh /usr/local/lib/remoterelay/rr-common.sh
+  fi
+
+  # The management entry point ships as remoterelay.sh in the payload.
+  local mt=""
+  for c in "$SCRIPT_DIR/remoterelay.sh" "$SCRIPT_DIR/remoterelay"; do
+    if [ -f "$c" ]; then mt="$c"; break; fi
+  done
+  if [ -n "$mt" ]; then
+    cp "$mt" /usr/local/bin/remoterelay
+    chmod 755 /usr/local/bin/remoterelay
+    SUMMARY+=("Management tool installed — run: sudo remoterelay")
+  else
+    echo "Warning: remoterelay tool not found in payload; skipping." >&2
+  fi
+
+  # Keep a copy of the libraries alongside the install for reference/uninstall.
+  ensure_dir_owned_by_user "$BASE_INSTALL_DIR/lib"
+  if [ -n "$RR_LIBDIR" ] && [ -f "$RR_LIBDIR/rr-ui.sh" ]; then
+    cp "$RR_LIBDIR/rr-ui.sh" "$RR_LIBDIR/rr-common.sh" "$BASE_INSTALL_DIR/lib/" 2>/dev/null || true
+  fi
+  chown -R "$APP_USER:$APP_USER" "$BASE_INSTALL_DIR/lib" 2>/dev/null || true
+
+  # Record where everything lives so the manager/updater don't have to guess.
+  if command -v rr_write_install_conf >/dev/null 2>&1; then
+    rr_write_install_conf "$CHANNEL"
+  fi
+}
+
+ui_step "Target user: $APP_USER"
+ui_step "Install root: $BASE_INSTALL_DIR"
 
 migrate_legacy_layout
 
@@ -844,86 +908,73 @@ fi
 DO_INSTALL_SERVER=false
 DO_INSTALL_CLIENT=false
 
-if $SERVER_ALREADY_PRESENT || $CLIENT_ALREADY_PRESENT; then
-  echo "Existing installation detected."
-  if $SERVER_ALREADY_PRESENT; then
-    if prompt_yes_no "Update server component? [Y/n] " "Y"; then
-      DO_INSTALL_SERVER=true
-    fi
+if [ -n "$FORCE_SERVER" ] || [ -n "$FORCE_CLIENT" ]; then
+  # Explicit --server-only / --client-only.
+  if [ "$FORCE_SERVER" = 1 ]; then DO_INSTALL_SERVER=true; fi
+  if [ "$FORCE_CLIENT" = 1 ]; then DO_INSTALL_CLIENT=true; fi
+elif [ "${RR_UNATTENDED:-0}" = 1 ]; then
+  # Headless: update whatever is present, otherwise install both.
+  if $SERVER_ALREADY_PRESENT || $CLIENT_ALREADY_PRESENT; then
+    if $SERVER_ALREADY_PRESENT; then DO_INSTALL_SERVER=true; fi
+    if $CLIENT_ALREADY_PRESENT; then DO_INSTALL_CLIENT=true; fi
   else
-    if prompt_yes_no "Install server component? [y/N] " "N"; then
-      DO_INSTALL_SERVER=true
-    fi
-  fi
-
-  if $CLIENT_ALREADY_PRESENT; then
-    if prompt_yes_no "Update client component? [Y/n] " "Y"; then
-      DO_INSTALL_CLIENT=true
-    fi
-  else
-    if prompt_yes_no "Install client component? [y/N] " "N"; then
-      DO_INSTALL_CLIENT=true
-    fi
-  fi
-else
-  if prompt_yes_no "Install server component? [Y/n] " "Y"; then
     DO_INSTALL_SERVER=true
-  fi
-
-  if prompt_yes_no "Install client component? [Y/n] " "Y"; then
     DO_INSTALL_CLIENT=true
   fi
-
-  if ! $DO_INSTALL_SERVER && ! $DO_INSTALL_CLIENT; then
-    echo "Nothing selected. Exiting."
-    exit 0
+else
+  # Interactive component picker. Pre-check what is already present, or both on a
+  # fresh machine.
+  sdef=on; cdef=on
+  prompt_title="Select components"
+  if $SERVER_ALREADY_PRESENT || $CLIENT_ALREADY_PRESENT; then
+    sdef=off; cdef=off
+    if $SERVER_ALREADY_PRESENT; then sdef=on; fi
+    if $CLIENT_ALREADY_PRESENT; then cdef=on; fi
+    prompt_title="Select components (existing install detected)"
   fi
+  SELECTION=$(ui_checklist "$prompt_title" "Space toggles, Enter confirms. Install or update:" \
+    server "RemoteRelay Server (relay control on this Pi)" "$sdef" \
+    client "RemoteRelay Client (touch UI)" "$cdef")
+  case " $SELECTION " in *" server "*) DO_INSTALL_SERVER=true ;; esac
+  case " $SELECTION " in *" client "*) DO_INSTALL_CLIENT=true ;; esac
 fi
 
+if ! $DO_INSTALL_SERVER && ! $DO_INSTALL_CLIENT; then
+  ui_info "Nothing selected. Exiting."
+  exit 0
+fi
+
+# --- Client connection target ---
 SERVER_ADDRESS=""
 if $DO_INSTALL_CLIENT; then
-  # Scenario 1: Installing BOTH Server and Client -> Default to localhost silently
   if $DO_INSTALL_SERVER; then
-     echo "Installing both server and client: defaulting client to localhost."
-     SERVER_ADDRESS="localhost"
+    # Installing both -> client talks to the local server.
+    ui_info "Installing both server and client: client will use localhost."
+    SERVER_ADDRESS="localhost"
   else
-     # Scenario 2: Installing Client ONLY (or updating)
-     # We still want to respect existing config if updating
-     local_default=""
-     
-     if command -v jq >/dev/null 2>&1 && [ -f "$CLIENT_INSTALL_DIR/ClientConfig.json" ]; then
-         existing_host=$(jq -r '.Host // empty' "$CLIENT_INSTALL_DIR/ClientConfig.json")
-         if [ -n "$existing_host" ]; then
-             local_default="$existing_host"
-         fi
-     fi
-
-     echo "Configure Client Connection:"
-     echo "  1) Use Service Discovery (Auto-detect server on network) [Default]"
-     echo "  2) Specify Server IP/Hostname"
-     read -r -p "Choice [1]: " conn_choice
-     conn_choice=${conn_choice:-1}
-     
-     if [ "$conn_choice" = "2" ]; then
-        if [ -n "$local_default" ]; then
-            read -r -p "Enter Server IP/Hostname [$local_default]: " input_addr
-            SERVER_ADDRESS=${input_addr:-$local_default}
-        else
-            read -r -p "Enter Server IP/Hostname: " input_addr
-            SERVER_ADDRESS=${input_addr:-""}
-        fi
-     else
+    existing_host=""
+    if command -v jq >/dev/null 2>&1 && [ -f "$CLIENT_INSTALL_DIR/ClientConfig.json" ]; then
+      existing_host=$(jq -r '.Host // empty' "$CLIENT_INSTALL_DIR/ClientConfig.json" 2>/dev/null || true)
+    fi
+    if [ "${RR_UNATTENDED:-0}" = 1 ]; then
+      SERVER_ADDRESS="$existing_host"   # keep existing host, else auto-discovery
+    else
+      conn=$(ui_menu "Client connection" "How should the client find the server?" \
+        discover "Auto-detect the server on the network (recommended)" \
+        fixed    "Connect to a specific IP / hostname")
+      if [ "$conn" = "fixed" ]; then
+        SERVER_ADDRESS=$(ui_inputbox "Server address" "Enter the server IP or hostname:" "$existing_host")
+      else
         SERVER_ADDRESS=""
-     fi
+      fi
+    fi
   fi
 fi
 
+# --- Optional custom NTP servers ---
 NTP_SERVERS=""
-if prompt_yes_no "Configure custom NTP servers? [y/N] " "N"; then
-  read -r -p "Enter NTP server addresses (space-separated): " NTP_SERVERS
-  if [ -z "$NTP_SERVERS" ]; then
-    echo "No NTP servers entered, skipping."
-  fi
+if [ "${RR_UNATTENDED:-0}" != 1 ] && ui_yesno "Time sync" "Configure custom NTP time servers?" no; then
+  NTP_SERVERS=$(ui_inputbox "NTP servers" "Enter NTP servers (space-separated):" "")
 fi
 
 # Mark that we're now modifying the system
@@ -941,6 +992,7 @@ fi
 copy_uninstall_script
 copy_update_script
 configure_ntp "$NTP_SERVERS"
+install_management_tool
 
 chown -R "$APP_USER:$APP_USER" "$BASE_INSTALL_DIR"
 
@@ -986,17 +1038,25 @@ fi
 # Installation succeeded - disable cleanup trap
 CLEANUP_NEEDED=false
 
-echo
-echo "----------------------------------------------------"
-echo "Installation complete"
-echo "----------------------------------------------------"
+# Build the completion summary.
+SUMMARY_TEXT="RemoteRelay was installed successfully."$'\n'
+if [ "$VERIFY_FAILED" = true ]; then
+  SUMMARY_TEXT="RemoteRelay installed, but some checks reported warnings — review the output."$'\n'
+fi
+SUMMARY_TEXT+=$'\n'"What was done:"$'\n'
 for line in "${SUMMARY[@]}"; do
-  echo "- $line"
+  SUMMARY_TEXT+="  • $line"$'\n'
 done
+SUMMARY_TEXT+=$'\n'"Manage everything from one place:"$'\n'
+SUMMARY_TEXT+="  sudo remoterelay"$'\n'
+if $DO_INSTALL_SERVER; then
+  SUMMARY_TEXT+=$'\n'"Server service : systemctl status $SERVER_SERVICE_NAME"$'\n'
+fi
+if $DO_INSTALL_CLIENT; then
+  SUMMARY_TEXT+="Client binary  : $CLIENT_INSTALL_DIR/RemoteRelay"$'\n'
+fi
+SUMMARY_TEXT+="Config files   : $BASE_INSTALL_DIR (owned by $APP_USER)"
 
-echo
-echo "Server service: systemctl status $SERVER_SERVICE_NAME"
-echo "Client binary: $CLIENT_INSTALL_DIR/RemoteRelay"
-echo "Configuration lives in user-owned files at $BASE_INSTALL_DIR"
+ui_msgbox "Installation complete" "$SUMMARY_TEXT"
 
 exit 0

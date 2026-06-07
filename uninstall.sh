@@ -5,6 +5,24 @@ set -euo pipefail
 SERVER_SERVICE_NAME="remote-relay-server.service"
 SERVER_SERVICE_FILE="/etc/systemd/system/$SERVER_SERVICE_NAME"
 
+# Load the shared UI library if available (graceful text fallback otherwise).
+_self_dir="$(cd "$(dirname "$0")" && pwd)"
+RR_LIB=""
+for d in /usr/local/lib/remoterelay "$_self_dir/lib" "$_self_dir"; do
+  if [ -f "$d/rr-ui.sh" ]; then RR_LIB="$d"; break; fi
+done
+if [ -n "$RR_LIB" ]; then
+  # shellcheck source=lib/rr-ui.sh
+  . "$RR_LIB/rr-ui.sh"
+else
+  ui_header(){ echo; echo "== $1 =="; }; ui_step(){ echo "> $1"; }
+  ui_info(){ echo "  $1"; }; ui_ok(){ echo "  [ok] $1"; }
+  ui_warn(){ echo "  [warn] $1" >&2; }; ui_error(){ echo "  [error] $1" >&2; }
+  ui_msgbox(){ echo; echo "$1"; echo "$2"; }
+  ui_yesno(){ return 0; }
+fi
+RR_BACKTITLE="RemoteRelay uninstaller"
+
 if [ "$EUID" -eq 0 ]; then
     APP_USER="${SUDO_USER:-}"
     if [ -z "$APP_USER" ] || [ "$APP_USER" = "root" ]; then
@@ -85,18 +103,10 @@ fi
 echo
 
 ask_yes_no() {
-    local prompt="$1"
-    local default="$2"
-    local reply
-    while true; do
-        read -r -p "$prompt" reply || reply=""
-        reply=${reply:-$default}
-        case "${reply^^}" in
-            Y|YES) return 0 ;;
-            N|NO) return 1 ;;
-        esac
-        echo "Please answer y or n."
-    done
+    # Compatibility shim over ui_yesno. $1 = prompt, $2 = default (Y/N).
+    local default=yes
+    { [ "${2^^}" = "N" ] || [ "${2^^}" = "NO" ]; } && default=no
+    ui_yesno "RemoteRelay uninstaller" "$1" "$default"
 }
 
 REMOVE_SERVER=false
@@ -248,25 +258,38 @@ fi
 
 remove_legacy_tree
 
+# When both components are gone, also remove the global management tool and its
+# shared libraries / install metadata.
+remove_management_tooling() {
+    local removed=false
+    if [ -f /usr/local/bin/remoterelay ]; then rm -f /usr/local/bin/remoterelay; removed=true; fi
+    if [ -d /usr/local/lib/remoterelay ]; then rm -rf /usr/local/lib/remoterelay; removed=true; fi
+    if [ -d /etc/remoterelay ]; then rm -rf /etc/remoterelay; removed=true; fi
+    if [ -d "$BASE_INSTALL_DIR/lib" ]; then rm -rf "$BASE_INSTALL_DIR/lib"; fi
+    $removed && SUMMARY+=("Removed management tool and metadata")
+}
+
+server_remains=false; client_remains=false
+[ -f "$SERVER_INSTALL_DIR/RemoteRelay.Server" ] && server_remains=true
+[ -f "$CLIENT_INSTALL_DIR/RemoteRelay" ] && client_remains=true
+if ! $server_remains && ! $client_remains; then
+    remove_management_tooling
+fi
+
 if [ -d "$BASE_INSTALL_DIR" ] && [ -z "$(ls -A "$BASE_INSTALL_DIR" 2>/dev/null)" ]; then
     echo "Removing empty directory $BASE_INSTALL_DIR"
     rmdir "$BASE_INSTALL_DIR"
     SUMMARY+=("Removed empty $BASE_INSTALL_DIR")
 fi
 
-echo
-echo "----------------------------------------------------"
-echo "Uninstall complete"
-echo "----------------------------------------------------"
-for item in "${SUMMARY[@]}"; do
-    echo "- $item"
-done
-
+SUMMARY_TEXT=""
 if [ ${#SUMMARY[@]} -eq 0 ]; then
-    echo "No changes were made."
+    SUMMARY_TEXT="No changes were made."
+else
+    SUMMARY_TEXT="RemoteRelay was uninstalled."$'\n\n'
+    for item in "${SUMMARY[@]}"; do SUMMARY_TEXT+="  • $item"$'\n'; done
+    SUMMARY_TEXT+=$'\n'"If any components remain, rerun this script with sudo as needed."
 fi
-
-echo
-echo "If any components remain, rerun this script with sudo as needed."
+ui_msgbox "Uninstall complete" "$SUMMARY_TEXT"
 
 exit 0

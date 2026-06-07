@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:fw="http://wixtoolset.org/schemas/v4/wxs/firewall"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package
+      Name="RemoteRelay"
+      Manufacturer="RemoteRelay"
+      Version="$(var.BuildVersion)"
+      UpgradeCode="b1f3a7c4-8e7e-4f6a-9c2d-2d51c4f8a401"
+      InstallerVersion="500"
+      Scope="perMachine"
+      Compressed="yes">
+
+    <SummaryInformation Description="RemoteRelay - SignalR-based relay switcher" />
+
+    <MajorUpgrade
+        Schedule="afterInstallExecute"
+        DowngradeErrorMessage="A newer version of RemoteRelay is already installed." />
+
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/" />
+
+    <!-- User-editable properties exposed by custom dialogs. K8090_PORT and
+         LOGO_FILE intentionally have no Value; they're populated by the UI
+         (or left blank, which the CA tolerates). -->
+    <Property Id="SERVER_PORT" Value="33101" />
+    <Property Id="RELAY_DRIVER" Value="K8090" />
+    <Property Id="K8090_PORT" Secure="yes" />
+    <Property Id="LOGO_FILE" Secure="yes" />
+    <Property Id="CLIENT_HOST" Value="localhost" />
+    <Property Id="CLIENT_PORT" Value="33101" />
+
+    <!-- ============== Directory tree ============== -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="RemoteRelay">
+        <Directory Id="CLIENTFOLDER" Name="Client" />
+        <Directory Id="SERVERFOLDER" Name="Server" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="RemoteRelayMenuFolder" Name="RemoteRelay" />
+    </StandardDirectory>
+
+    <!-- ============== Features ============== -->
+    <Feature Id="ClientFeature"
+             Title="RemoteRelay Client"
+             Description="The desktop user interface that connects to a RemoteRelay Server."
+             Level="1"
+             ConfigurableDirectory="INSTALLFOLDER">
+      <ComponentGroupRef Id="ClientFiles" />
+      <ComponentRef Id="ClientShortcuts" />
+    </Feature>
+
+    <Feature Id="ServerFeature"
+             Title="RemoteRelay Server"
+             Description="The relay server. Installed as a Windows Service that starts at boot."
+             Level="1"
+             ConfigurableDirectory="INSTALLFOLDER">
+      <ComponentGroupRef Id="ServerFiles" />
+      <ComponentRef Id="ServerMainExe" />
+    </Feature>
+
+    <!-- ============== Client components ============== -->
+    <!-- StagedClientDir is a sanitised copy of the publish output produced by
+         the wixproj's StageFiles target: pdbs and ClientConfig.json removed. -->
+    <ComponentGroup Id="ClientFiles" Directory="CLIENTFOLDER">
+      <Files Include="!(bindpath.StagedClientDir)\**" />
+    </ComponentGroup>
+
+    <Component Id="ClientShortcuts" Directory="RemoteRelayMenuFolder" Guid="ec2c5d8b-1bb5-4d04-94c7-3f87f7c54a01">
+      <Shortcut Id="ClientStartMenuShortcut"
+                Name="RemoteRelay Client"
+                Description="RemoteRelay Client"
+                Target="[CLIENTFOLDER]RemoteRelay.exe"
+                WorkingDirectory="CLIENTFOLDER" />
+      <RemoveFolder Id="RemoveRemoteRelayMenuFolder" On="uninstall" />
+      <!-- HKCU is required by ICE57/ICE38/ICE43 because the shortcut is
+           installed into the per-user Start Menu folder. -->
+      <RegistryValue Root="HKCU"
+                     Key="Software\RemoteRelay\Client"
+                     Name="installed"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+
+    <!-- ============== Server components ============== -->
+    <!-- StagedServerDir is the publish output minus pdbs, the main exe (handled
+         separately for ServiceInstall), and any pre-existing config.json. -->
+    <ComponentGroup Id="ServerFiles" Directory="SERVERFOLDER">
+      <Files Include="!(bindpath.StagedServerDir)\**" />
+    </ComponentGroup>
+
+    <Component Id="ServerMainExe" Directory="SERVERFOLDER" Guid="3c3afb5a-bf3b-4d2f-91ad-8f8d2cf3a402">
+      <File Id="ServerExe"
+            Source="!(bindpath.PublishServerDir)\RemoteRelay.Server.exe"
+            KeyPath="yes" />
+
+      <ServiceInstall Id="RemoteRelayServerService"
+                      Name="RemoteRelayServer"
+                      DisplayName="RemoteRelay Server"
+                      Description="RemoteRelay SignalR relay server."
+                      Type="ownProcess"
+                      Start="auto"
+                      ErrorControl="normal"
+                      Account="LocalSystem"
+                      Vital="yes" />
+
+      <ServiceControl Id="RemoteRelayServerServiceControl"
+                      Name="RemoteRelayServer"
+                      Start="install"
+                      Stop="both"
+                      Remove="uninstall"
+                      Wait="yes" />
+
+      <fw:FirewallException Id="RemoteRelayServerPort"
+                            Name="RemoteRelay Server"
+                            Description="Inbound TCP for RemoteRelay Server."
+                            Port="[SERVER_PORT]"
+                            Protocol="tcp"
+                            Scope="any"
+                            Profile="all" />
+    </Component>
+
+    <!-- ============== Custom actions ============== -->
+    <Binary Id="RemoteRelayCustomActionsDll"
+            SourceFile="!(bindpath.CustomActions)\RemoteRelay.Installer.CustomActions.CA.dll" />
+
+    <CustomAction Id="PopulateComPorts"
+                  BinaryRef="RemoteRelayCustomActionsDll"
+                  DllEntry="PopulateComPorts"
+                  Execute="immediate"
+                  Return="ignore" />
+
+    <CustomAction Id="WriteServerConfig"
+                  BinaryRef="RemoteRelayCustomActionsDll"
+                  DllEntry="WriteServerConfig"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="check" />
+
+    <CustomAction Id="WriteClientConfig"
+                  BinaryRef="RemoteRelayCustomActionsDll"
+                  DllEntry="WriteClientConfig"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="check" />
+
+    <SetProperty Id="WriteServerConfig"
+                 Before="WriteServerConfig"
+                 Sequence="execute"
+                 Value="InstallFolder=[SERVERFOLDER];ServerPort=[SERVER_PORT];RelayDriver=[RELAY_DRIVER];K8090Port=[K8090_PORT];LogoFile=[LOGO_FILE]" />
+
+    <SetProperty Id="WriteClientConfig"
+                 Before="WriteClientConfig"
+                 Sequence="execute"
+                 Value="InstallFolder=[CLIENTFOLDER];ClientHost=[CLIENT_HOST];ClientPort=[CLIENT_PORT]" />
+
+    <InstallUISequence>
+      <Custom Action="PopulateComPorts" After="CostFinalize" Condition="NOT Installed" />
+    </InstallUISequence>
+
+    <InstallExecuteSequence>
+      <!-- Stop the service before file replacement on upgrade. WiX schedules
+           the ServiceControl in StopServices automatically; the explicit
+           conditions on Write*Config gate these to fresh installs + new feature
+           selection only. -->
+      <Custom Action="WriteServerConfig"
+              After="InstallFiles"
+              Condition="(&amp;ServerFeature=3) AND NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="WriteClientConfig"
+              After="InstallFiles"
+              Condition="(&amp;ClientFeature=3) AND NOT REMOVE~=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
+
+    <!-- ============== UI ============== -->
+    <ui:WixUI Id="WixUI_FeatureTree" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+    <UIRef Id="WixUI_RemoteRelay_Overrides" />
+
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+  </Package>
+</Wix>

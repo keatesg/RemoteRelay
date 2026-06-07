@@ -107,6 +107,7 @@ public class Program
         var initialSettings = LoadInitialSettings(configPath);
 
         var builder = WebApplication.CreateBuilder(args);
+        builder.Host.UseWindowsService(options => options.ServiceName = "RemoteRelay Server");
         builder.Services.AddSignalR();
         builder.Services.AddSingleton<TcpMessageService>();
         builder.Services.AddSingleton<SwitcherState>(sp =>

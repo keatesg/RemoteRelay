@@ -1,0 +1,74 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <PropertyGroup>
+    <OutputName>RemoteRelay-Setup</OutputName>
+    <OutputType>Package</OutputType>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <SuppressIces>ICE17;ICE61;ICE69</SuppressIces>
+
+    <!-- MSI ProductVersion. CI overrides via -p:BuildVersion=<release version>
+         so MajorUpgrade can perform clean in-place updates across releases. -->
+    <BuildVersion Condition="'$(BuildVersion)' == ''">1.0.0.0</BuildVersion>
+    <DefineConstants>$(DefineConstants);BuildVersion=$(BuildVersion)</DefineConstants>
+
+    <!-- Override on the command line (CI) to point at the published self-contained outputs. -->
+    <PublishClientDir Condition="'$(PublishClientDir)' == ''">$(MSBuildThisFileDirectory)..\publish\client</PublishClientDir>
+    <PublishServerDir Condition="'$(PublishServerDir)' == ''">$(MSBuildThisFileDirectory)..\publish\server</PublishServerDir>
+
+    <!-- Path the CustomActions project drops its packaged *.CA.dll into. -->
+    <CustomActionsDir>$(MSBuildThisFileDirectory)..\RemoteRelay.Installer.CustomActions\bin\$(Configuration)\net472\</CustomActionsDir>
+
+    <!-- Sanitised copies of the publish outputs produced by the StageFiles target. -->
+    <StagedClientDir>$(MSBuildThisFileDirectory)obj\$(Configuration)\staged\client</StagedClientDir>
+    <StagedServerDir>$(MSBuildThisFileDirectory)obj\$(Configuration)\staged\server</StagedServerDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Firewall.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <BindPath Include="$(PublishServerDir)" BindName="PublishServerDir" />
+    <BindPath Include="$(StagedClientDir)" BindName="StagedClientDir" />
+    <BindPath Include="$(StagedServerDir)" BindName="StagedServerDir" />
+    <BindPath Include="$(CustomActionsDir)" BindName="CustomActions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RemoteRelay.Installer.CustomActions\RemoteRelay.Installer.CustomActions.csproj">
+      <Name>RemoteRelay.Installer.CustomActions</Name>
+      <Private>False</Private>
+      <DoNotHarvest>True</DoNotHarvest>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Items must be defined outside the target so MSBuild expands them
+       before running the target body. -->
+  <ItemGroup>
+    <_ClientStage Include="$(PublishClientDir)\**\*"
+                  Exclude="$(PublishClientDir)\**\*.pdb;$(PublishClientDir)\**\ClientConfig.json" />
+    <_ServerStage Include="$(PublishServerDir)\**\*"
+                  Exclude="$(PublishServerDir)\**\*.pdb;$(PublishServerDir)\**\config.json;$(PublishServerDir)\RemoteRelay.Server.exe" />
+  </ItemGroup>
+
+  <!-- Stage publish outputs into sanitised copies before WiX harvests them. -->
+  <Target Name="StageFiles" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(PublishClientDir)\RemoteRelay.exe')"
+           Text="Client publish output not found at '$(PublishClientDir)'. Run: dotnet publish RemoteRelay/RemoteRelay.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish/client" />
+    <Error Condition="!Exists('$(PublishServerDir)\RemoteRelay.Server.exe')"
+           Text="Server publish output not found at '$(PublishServerDir)'. Run: dotnet publish RemoteRelay.Server/RemoteRelay.Server.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish/server" />
+
+    <RemoveDir Directories="$(StagedClientDir);$(StagedServerDir)" />
+    <MakeDir Directories="$(StagedClientDir);$(StagedServerDir)" />
+
+    <Copy SourceFiles="@(_ClientStage)"
+          DestinationFiles="@(_ClientStage->'$(StagedClientDir)\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_ServerStage)"
+          DestinationFiles="@(_ServerStage->'$(StagedServerDir)\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

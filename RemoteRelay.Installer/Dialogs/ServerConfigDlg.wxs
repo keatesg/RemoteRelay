@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Fragment>
+    <UI>
+      <Dialog Id="ServerConfigDlg" Width="370" Height="270" Title="[ProductName] Setup" NoMinimize="yes">
+
+        <!-- Banner -->
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
+                 TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="220" Height="15" Transparent="yes"
+                 Text="{\WixUI_Font_Title}Server configuration" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes"
+                 Text="Configure how the RemoteRelay Server runs on this machine." />
+
+        <!-- Body -->
+        <Control Id="ServerPortLabel" Type="Text" X="20" Y="65" Width="100" Height="15"
+                 Text="&amp;Server port:" />
+        <Control Id="ServerPortEdit" Type="Edit" X="130" Y="63" Width="80" Height="18"
+                 Property="SERVER_PORT" Text="{5}" />
+        <Control Id="ServerPortHint" Type="Text" X="215" Y="65" Width="140" Height="15" Transparent="yes"
+                 Text="(default 33101, TCP)" />
+
+        <Control Id="RelayDriverLabel" Type="Text" X="20" Y="95" Width="100" Height="15"
+                 Text="&amp;Relay driver:" />
+        <Control Id="RelayDriverCombo" Type="ComboBox" X="130" Y="93" Width="120" Height="18"
+                 Property="RELAY_DRIVER" ComboList="yes" Sorted="no">
+          <ComboBox Property="RELAY_DRIVER">
+            <ListItem Text="Auto-detect"     Value="Auto" />
+            <ListItem Text="Mock (no hardware)" Value="Mock" />
+            <ListItem Text="Velleman K8090"  Value="K8090" />
+            <ListItem Text="Raspberry Pi GPIO" Value="RpiGpio" />
+          </ComboBox>
+        </Control>
+
+        <Control Id="K8090PortLabel" Type="Text" X="20" Y="125" Width="100" Height="15"
+                 Text="K8090 serial &amp;port:" />
+        <Control Id="K8090PortCombo" Type="ComboBox" X="130" Y="123" Width="120" Height="18"
+                 Property="K8090_PORT" ComboList="yes" Sorted="yes" />
+        <Control Id="K8090PortHint" Type="Text" X="20" Y="143" Width="330" Height="20" Transparent="yes"
+                 Text="Only used when the relay driver is set to K8090. Pick the COM port the K8090 is connected to (or type one)." />
+
+        <Control Id="LogoFileLabel" Type="Text" X="20" Y="175" Width="100" Height="15"
+                 Text="&amp;Logo file (optional):" />
+        <Control Id="LogoFileEdit" Type="Edit" X="130" Y="173" Width="220" Height="18"
+                 Property="LOGO_FILE" Text="{200}" />
+        <Control Id="LogoFileHint" Type="Text" X="20" Y="193" Width="330" Height="20" Transparent="yes"
+                 Text="Path to an image to serve at /logo. Leave blank to disable." />
+
+        <!-- Footer -->
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
+                 Text="&amp;Back" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17"
+                 Default="yes" Text="&amp;Next" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17"
+                 Cancel="yes" Text="Cancel" />
+      </Dialog>
+    </UI>
+  </Fragment>
+</Wix>

@@ -21,6 +21,8 @@ jobs:
   # Call the build workflow to produce artifacts
   build:
     uses: ./.github/workflows/dotnet.yml
+    with:
+      version: ${{ inputs.version }}
 
   # Create the release using artifacts from the build job
   release:
@@ -30,6 +32,9 @@ jobs:
     permissions:
       contents: write  # Required to create releases
     steps:
+      - name: Checkout (for the bootstrap script)
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -41,13 +46,19 @@ jobs:
           # Zip each artifact folder
           for dir in */; do
             name="${dir%/}"
-            # Skip if already a zip/sh file
-            if [[ "$name" == *.zip ]] || [[ "$name" == *.sh ]]; then
+            # Skip if already a zip/sh/msi file
+            if [[ "$name" == *.zip ]] || [[ "$name" == *.sh ]] || [[ "$name" == *.msi ]]; then
               continue
             fi
             cd "$name"
-            if [[ "$name" == *Installer* ]]; then
-              # For installer, just move the .sh file up
+            if [[ "$name" == *Installer-windows* ]]; then
+              # Windows MSI installer — find the .msi (may be nested) and move up
+              msi=$(find . -type f -name '*.msi' | head -n1)
+              if [[ -n "$msi" ]]; then
+                mv "$msi" "../${name}.msi"
+              fi
+            elif [[ "$name" == *Installer* ]]; then
+              # Linux makeself installer — move the .sh up
               mv *.sh "../${name}.sh" 2>/dev/null || true
             else
               zip -r "../${name}.zip" .
@@ -56,6 +67,13 @@ jobs:
             rm -rf "$name"
           done
           ls -la
+
+      - name: Stage bootstrap script
+        run: |
+          # Attach the curl|bash bootstrap to the release. Also expose it under
+          # the name "install" for a tidy releases/latest/download/install URL.
+          cp get.sh ./artifacts/get.sh
+          cp get.sh ./artifacts/install
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

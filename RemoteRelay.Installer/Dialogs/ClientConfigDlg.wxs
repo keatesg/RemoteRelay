@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Fragment>
+    <UI>
+      <Dialog Id="ClientConfigDlg" Width="370" Height="270" Title="[ProductName] Setup" NoMinimize="yes">
+
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
+                 TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="220" Height="15" Transparent="yes"
+                 Text="{\WixUI_Font_Title}Client configuration" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="15" Transparent="yes"
+                 Text="Tell the Client where to find the RemoteRelay Server." />
+
+        <Control Id="HostLabel" Type="Text" X="20" Y="80" Width="100" Height="15"
+                 Text="Server &amp;host or IP:" />
+        <Control Id="HostEdit" Type="Edit" X="130" Y="78" Width="180" Height="18"
+                 Property="CLIENT_HOST" Text="{120}" />
+        <Control Id="HostHint" Type="Text" X="20" Y="98" Width="330" Height="20" Transparent="yes"
+                 Text="Use 'localhost' if the Server is being installed on this same machine." />
+
+        <Control Id="PortLabel" Type="Text" X="20" Y="130" Width="100" Height="15"
+                 Text="Server &amp;port:" />
+        <Control Id="PortEdit" Type="Edit" X="130" Y="128" Width="80" Height="18"
+                 Property="CLIENT_PORT" Text="{5}" />
+        <Control Id="PortHint" Type="Text" X="215" Y="130" Width="140" Height="15" Transparent="yes"
+                 Text="(default 33101)" />
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
+                 Text="&amp;Back" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17"
+                 Default="yes" Text="&amp;Next" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17"
+                 Cancel="yes" Text="Cancel" />
+      </Dialog>
+    </UI>
+  </Fragment>
+</Wix>

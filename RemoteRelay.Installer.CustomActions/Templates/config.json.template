@@ -1,0 +1,16 @@
+{
+  "Routes": [],
+  "DefaultRoutes": {},
+  "PhysicalSourceButtons": {},
+  "SourceColorPalette": {},
+  "ServerPort": {{SERVER_PORT}},
+  "RelayDriver": "{{RELAY_DRIVER}}",
+  "K8090": {
+    "Port": "{{K8090_PORT}}"
+  },
+  "FlashOnSelect": true,
+  "ShowIpOnScreen": true,
+  "Logging": true,
+  "LogoFile": "{{LOGO_FILE}}",
+  "ThemePalette": "Default"
+}

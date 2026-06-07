@@ -1,0 +1,6 @@
+# Shell scripts must use LF so they run correctly on Linux, even when committed
+# from Windows.
+*.sh text eol=lf
+get.sh text eol=lf
+remoterelay.sh text eol=lf
+lib/* text eol=lf

@@ -1,0 +1,5 @@
+{
+  "Host": "{{CLIENT_HOST}}",
+  "Port": {{CLIENT_PORT}},
+  "IsFullscreen": true
+}
