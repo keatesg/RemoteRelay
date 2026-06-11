@@ -124,57 +124,35 @@ public class SwitcherClient
         }
     }
 
-    public void SwitchSource(string source, string output)
+    public void SwitchSource(string source, string output) =>
+        _ = SendSafeAsync("SwitchSource", source, output);
+
+    public void ClearSource(string sourceName) =>
+        _ = SendSafeAsync("ClearSource", sourceName);
+
+    public void RequestStatus() =>
+        _ = SendSafeAsync("GetSystemState");
+
+    /// <summary>
+    /// Sends a hub message and observes the send task so transport failures are
+    /// logged instead of becoming unobserved task exceptions. A synchronous
+    /// try/catch around an unawaited SendAsync never sees those failures.
+    /// </summary>
+    private async Task SendSafeAsync(string methodName, params object?[] args)
     {
         if (!IsConnected)
         {
-            System.Diagnostics.Debug.WriteLine("Cannot switch source: connection is not active");
+            System.Diagnostics.Debug.WriteLine($"Cannot send {methodName}: connection is not active");
             return;
         }
 
         try
         {
-            _connection.SendAsync("SwitchSource", source, output);
+            await _connection.SendCoreAsync(methodName, args);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error sending SwitchSource command: {ex.Message}");
-        }
-    }
-
-    public void ClearSource(string sourceName)
-    {
-        if (!IsConnected)
-        {
-            System.Diagnostics.Debug.WriteLine("Cannot clear source: connection is not active");
-            return;
-        }
-
-        try
-        {
-            _connection.SendAsync("ClearSource", sourceName);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error sending ClearSource command: {ex.Message}");
-        }
-    }
-
-    public void RequestStatus()
-    {
-        if (!IsConnected)
-        {
-            System.Diagnostics.Debug.WriteLine("Cannot request status: connection is not active");
-            return;
-        }
-
-        try
-        {
-            _connection.SendAsync("GetSystemState");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error sending GetSystemState command: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Error sending {methodName} command: {ex.Message}");
         }
     }
 
@@ -186,23 +164,36 @@ public class SwitcherClient
             return;
         }
 
+        // Reset TCS for cases where settings might be requested again
+        lock (_requestLock)
+        {
+            if (_settingsTcs.Task.IsCompleted)
+            {
+                _settingsTcs = new TaskCompletionSource<AppSettings?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+        }
+
+        _ = RequestSettingsCoreAsync();
+    }
+
+    private async Task RequestSettingsCoreAsync()
+    {
         try
         {
-            // Reset TCS for cases where settings might be requested again
-            lock (_requestLock)
-            {
-                if (_settingsTcs.Task.IsCompleted)
-                {
-                    _settingsTcs = new TaskCompletionSource<AppSettings?>(TaskCreationOptions.RunContinuationsAsynchronously);
-                }
-            }
-            // _settings = null; // Removed to prevent null reference exceptions in UI binding
-            _connection.SendAsync("GetConfiguration");
+            await _connection.SendAsync("GetConfiguration");
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error sending GetConfiguration command: {ex.Message}");
-            _settingsTcs.TrySetException(ex);
+
+            // Fail the pending GetSettingsAsync immediately rather than letting it
+            // sit for the full timeout waiting for a response that will never come.
+            TaskCompletionSource<AppSettings?> tcs;
+            lock (_requestLock)
+            {
+                tcs = _settingsTcs;
+            }
+            tcs.TrySetException(ex);
         }
     }
 
@@ -214,13 +205,20 @@ public class SwitcherClient
             task = _settingsTcs.Task;
         }
 
-        if (await Task.WhenAny(task, Task.Delay(timeoutMs)) == task)
+        try
         {
-            return await task;
+            return await task.WaitAsync(TimeSpan.FromMilliseconds(timeoutMs));
         }
-
-        System.Diagnostics.Debug.WriteLine($"GetSettingsAsync timed out after {timeoutMs}ms");
-        return null;
+        catch (TimeoutException)
+        {
+            System.Diagnostics.Debug.WriteLine($"GetSettingsAsync timed out after {timeoutMs}ms");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"GetSettingsAsync failed: {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>

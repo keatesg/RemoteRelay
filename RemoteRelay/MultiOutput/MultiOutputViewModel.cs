@@ -90,6 +90,7 @@ public class MultiOutputViewModel : OperationViewModelBase
 
         Disposables.Add(Server._stateChanged
             .Take(1)
+            .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(status => HandleStatusUpdate(status)));
 
         if (CurrentStatus.Count > 0)

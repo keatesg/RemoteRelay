@@ -7,8 +7,10 @@
     <AssemblyName>RemoteRelay.Installer.CustomActions</AssemblyName>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <IsPackable>false</IsPackable>
-    <!-- This project is only built explicitly by the installer; opt out of the default solution build -->
     <Version>1.0.0</Version>
+    <!-- This project (and RemoteRelay.Installer) is excluded from the default
+         solution build via the .sln (no .Build.0 entries). It targets net472 and
+         is Windows-only, so it is built explicitly by CI/the installer instead. -->
   </PropertyGroup>
 
   <ItemGroup>

@@ -23,5 +23,13 @@ public partial class MainWindow : Window
             Close();
             e.Handled = true;
         }
+
+        if (e.Key == Key.F11)
+        {
+            WindowState = WindowState == WindowState.FullScreen ? WindowState.Normal : WindowState.FullScreen;
+            if (DataContext is MainWindowViewModel vm)
+                vm.SaveFullscreenState(WindowState == WindowState.FullScreen);
+            e.Handled = true;
+        }
     }
 }

@@ -14,12 +14,14 @@ using RemoteRelay.Setup;
 using RemoteRelay.SingleOutput;
 using Zeroconf;
 using System.Reactive.Disposables;
+using Avalonia.Threading;
 
 namespace RemoteRelay;
 
 public class MainWindowViewModel : ViewModelBase
 {
     private const int RetryIntervalSeconds = 5;
+    private readonly object _retryLock = new();
     private System.Timers.Timer? _retryTimer;
     private int _retryCountdown;
     private ClientConfig _clientConfig = new();
@@ -72,6 +74,12 @@ public class MainWindowViewModel : ViewModelBase
     public bool IsOperationViewReady => _operationViewModel != null;
 
     public bool IsFullscreen => _clientConfig.IsFullscreen ?? true;
+
+    public void SaveFullscreenState(bool isFullscreen)
+    {
+        _clientConfig.IsFullscreen = isFullscreen;
+        SaveConfig();
+    }
 
     private bool _showIpOnScreen = true;
     public bool ShowIpOnScreen
@@ -151,8 +159,12 @@ public class MainWindowViewModel : ViewModelBase
                }
            }));
 
-        // Subscribe to connection state changes
-        disposables.Add(SwitcherClient.Instance._connectionStateChanged.Subscribe(isConnected =>
+        // Subscribe to connection state changes. These fire on SignalR callback threads;
+        // OperationViewModel changes dispose/create view models (incl. DispatcherTimers)
+        // and update bindings, all of which must happen on the UI thread.
+        disposables.Add(SwitcherClient.Instance._connectionStateChanged
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(isConnected =>
         {
             if (!isConnected)
             {
@@ -306,62 +318,101 @@ public class MainWindowViewModel : ViewModelBase
 
     private void UpdateServerStatusMessageForRetry()
     {
-        ServerStatusMessage = $"Server offline. Trying to connect to {SwitcherClient.Instance.ServerUri}. Retrying in {_retryCountdown}s...";
+        var message = $"Server offline. Trying to connect to {SwitcherClient.Instance.ServerUri}. Retrying in {_retryCountdown}s...";
+        Dispatcher.UIThread.Post(() => ServerStatusMessage = message);
     }
 
     private void StartRetryTimer()
     {
-        _retryTimer?.Stop();
-        _retryTimer?.Dispose();
-
-        _retryCountdown = RetryIntervalSeconds;
-        UpdateServerStatusMessageForRetry();
-
-        _retryTimer = new System.Timers.Timer(1000); // 1 second interval
-        _retryTimer.Elapsed += async (sender, e) =>
+        lock (_retryLock)
         {
-            try
+            if (_retryTimer != null)
             {
+                // A retry cycle is already running; don't spawn a competing timer.
+                return;
+            }
+
+            _retryCountdown = RetryIntervalSeconds;
+            var timer = new System.Timers.Timer(1000); // 1 second interval
+            timer.Elapsed += async (_, _) => await OnRetryTimerTickAsync(timer);
+            _retryTimer = timer;
+            timer.Start();
+        }
+
+        UpdateServerStatusMessageForRetry();
+    }
+
+    private void StopRetryTimer()
+    {
+        lock (_retryLock)
+        {
+            _retryTimer?.Stop();
+            _retryTimer?.Dispose();
+            _retryTimer = null;
+        }
+    }
+
+    private async Task OnRetryTimerTickAsync(System.Timers.Timer timer)
+    {
+        try
+        {
+            lock (_retryLock)
+            {
+                if (!ReferenceEquals(timer, _retryTimer))
+                {
+                    return; // stale timer that was already replaced/stopped
+                }
+
+                _retryCountdown--;
                 if (_retryCountdown > 0)
                 {
-                    _retryCountdown--;
-                    UpdateServerStatusMessageForRetry();
+                    // Keep counting down; message updated below outside the lock.
                 }
-
-                if (_retryCountdown <= 0)
+                else
                 {
-                    _retryTimer?.Stop();
-                    _retryTimer?.Dispose();
+                    timer.Stop();
+                    timer.Dispose();
                     _retryTimer = null;
-
-                    ServerStatusMessage = $"Server offline. Trying to connect to {SwitcherClient.Instance.ServerUri}. Retrying now...";
-
-                    bool connected = await SwitcherClient.Instance.ConnectAsync();
-                    if (connected)
-                    {
-                        await OnConnected();
-                    }
-                    else
-                    {
-                        Task.Run(() => StartRetryTimer());
-                    }
                 }
             }
-            catch (Exception ex)
+
+            if (_retryCountdown > 0)
             {
-                Debug.WriteLine($"Error in retry timer: {ex.Message}");
-                // Restart retry timer on error using scheduler to avoid deeply stacked tasks
-                Task.Run(() => StartRetryTimer());
+                UpdateServerStatusMessageForRetry();
+                return;
             }
-        };
-        _retryTimer.Start();
+
+            var message = $"Server offline. Trying to connect to {SwitcherClient.Instance.ServerUri}. Retrying now...";
+            Dispatcher.UIThread.Post(() => ServerStatusMessage = message);
+
+            bool connected = await SwitcherClient.Instance.ConnectAsync();
+            if (connected)
+            {
+                await OnConnected();
+            }
+            else
+            {
+                StartRetryTimer();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error in retry timer: {ex.Message}");
+            StartRetryTimer();
+        }
     }
 
     private async Task OnConnected()
     {
-        _retryTimer?.Stop();
-        _retryTimer?.Dispose();
-        _retryTimer = null;
+        // Settings application creates/disposes view models and DispatcherTimers,
+        // but we can be called from timer/SignalR threads — hop to the UI thread.
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            await Dispatcher.UIThread.InvokeAsync(OnConnected);
+            return;
+        }
+
+        StopRetryTimer();
 
         ServerStatusMessage = $"Connected to {SwitcherClient.Instance.ServerUri}. Fetching settings...";
         SwitcherClient.Instance.RequestSettings();

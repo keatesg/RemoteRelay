@@ -14,11 +14,12 @@ namespace RemoteRelay.Server.Services;
 /// </summary>
 public class UdpListenerService : BackgroundService
 {
+    private static readonly TimeSpan BindRetryDelay = TimeSpan.FromSeconds(5);
+
     private readonly SwitcherState _switcherState;
     private readonly IHubContext<RelayHub> _hubContext;
     private readonly ILogger<UdpListenerService> _logger;
     private readonly int _port;
-    private UdpClient? _udpClient;
 
     public UdpListenerService(
         SwitcherState switcherState,
@@ -36,43 +37,64 @@ public class UdpListenerService : BackgroundService
     {
         _logger.LogInformation("UDP listener starting on port {Port}", _port);
 
-        try
+        // Outer loop: (re)bind the socket. The port can be transiently unavailable at boot,
+        // and a fatal socket error mid-run should recreate the listener rather than kill it.
+        while (!stoppingToken.IsCancellationRequested)
         {
-            _udpClient = new UdpClient(_port);
-            _logger.LogInformation("UDP listener ready on port {Port}", _port);
-
-            while (!stoppingToken.IsCancellationRequested)
+            UdpClient udpClient;
+            try
             {
+                udpClient = new UdpClient(_port);
+            }
+            catch (SocketException ex)
+            {
+                _logger.LogError(ex, "Failed to bind UDP listener on port {Port}. Retrying in {Delay}s.", _port, BindRetryDelay.TotalSeconds);
                 try
                 {
-                    var result = await _udpClient.ReceiveAsync(stoppingToken);
-                    var message = Encoding.UTF8.GetString(result.Buffer).Trim();
-                    
-                    _logger.LogInformation("UDP received from {RemoteEndPoint}: {Message}", 
-                        result.RemoteEndPoint, message);
-
-                    await ProcessMessageAsync(message);
+                    await Task.Delay(BindRetryDelay, stoppingToken);
                 }
-                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                catch (OperationCanceledException)
                 {
-                    // Normal shutdown
                     break;
                 }
-                catch (Exception ex)
+                continue;
+            }
+
+            _logger.LogInformation("UDP listener ready on port {Port}", _port);
+
+            using (udpClient)
+            {
+                while (!stoppingToken.IsCancellationRequested)
                 {
-                    _logger.LogError(ex, "Error receiving UDP message");
+                    try
+                    {
+                        var result = await udpClient.ReceiveAsync(stoppingToken);
+                        var message = Encoding.UTF8.GetString(result.Buffer).Trim();
+
+                        _logger.LogInformation("UDP received from {RemoteEndPoint}: {Message}",
+                            result.RemoteEndPoint, message);
+
+                        await ProcessMessageAsync(message);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        // Normal shutdown
+                        break;
+                    }
+                    catch (SocketException ex)
+                    {
+                        _logger.LogError(ex, "UDP socket error on port {Port}; recreating listener.", _port);
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error receiving UDP message");
+                    }
                 }
             }
         }
-        catch (SocketException ex)
-        {
-            _logger.LogError(ex, "Failed to start UDP listener on port {Port}", _port);
-        }
-        finally
-        {
-            _udpClient?.Dispose();
-            _logger.LogInformation("UDP listener stopped");
-        }
+
+        _logger.LogInformation("UDP listener stopped");
     }
 
     private async Task ProcessMessageAsync(string message)
@@ -157,17 +179,20 @@ public class UdpListenerService : BackgroundService
 
     private static string? FindMatchingName(string text, IList<string> candidates)
     {
-        // Try exact match first
-        foreach (var candidate in candidates)
+        // Longest names first, otherwise "Output 1" would shadow "Output 10".
+        var ordered = candidates.OrderByDescending(c => c.Length).ToList();
+
+        // Try prefix match first
+        foreach (var candidate in ordered)
         {
             if (text.StartsWith(candidate, StringComparison.OrdinalIgnoreCase))
             {
                 return candidate;
             }
         }
-        
+
         // Try case-insensitive contains as fallback
-        foreach (var candidate in candidates)
+        foreach (var candidate in ordered)
         {
             if (text.Contains(candidate, StringComparison.OrdinalIgnoreCase))
             {

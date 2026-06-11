@@ -49,6 +49,7 @@ The server is configured using the `config.json` file located in the same direct
   },
   "FlashOnSelect": true,
   "ShowIpOnScreen": true,
+  "ShowClockOnScreen": true,
   "Logging": true,
   "LogoFile": null
 }
@@ -235,6 +236,18 @@ Whether to display the server's IP address on an attached display (if available)
 - `true`: Show IP address on startup
 - `false`: Don't show IP
 - Default: `false`
+
+### ShowClockOnScreen (Optional)
+
+Whether to display the date and time at the top of the client screen. Useful to disable on devices without a reliable NTP/RTC source where the displayed time would be inaccurate.
+
+```json
+"ShowClockOnScreen": true
+```
+
+- `true`: Show the date and clock
+- `false`: Hide the date and clock
+- Default: `true`
 
 ### Logging (Optional)
 

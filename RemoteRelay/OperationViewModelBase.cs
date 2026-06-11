@@ -40,6 +40,7 @@ public abstract class OperationViewModelBase : ViewModelBase, IDisposable
         Settings = settings;
         TimeoutSeconds = timeoutSeconds;
         ShowIpOnScreen = _showIpOverride ?? settings.ShowIpOnScreen;
+        ShowClockOnScreen = settings.ShowClockOnScreen ?? true;
         Cancel = new SourceButtonViewModel("Cancel");
 
         Cancel.Clicked.Subscribe(_ => _cancelRequests.OnNext(Unit.Default)).DisposeWith(_disposables);
@@ -69,6 +70,7 @@ public abstract class OperationViewModelBase : ViewModelBase, IDisposable
            .Subscribe(newSettings =>
            {
                ShowIpOnScreen = _showIpOverride ?? newSettings.ShowIpOnScreen;
+               ShowClockOnScreen = newSettings.ShowClockOnScreen ?? true;
            })
            .DisposeWith(_disposables);
 
@@ -140,6 +142,13 @@ public abstract class OperationViewModelBase : ViewModelBase, IDisposable
     {
         get => _showIpOnScreen;
         set => this.RaiseAndSetIfChanged(ref _showIpOnScreen, value);
+    }
+
+    private bool _showClockOnScreen = true;
+    public bool ShowClockOnScreen
+    {
+        get => _showClockOnScreen;
+        set => this.RaiseAndSetIfChanged(ref _showClockOnScreen, value);
     }
 
     public bool FlashOnSelect => Settings.FlashOnSelect;

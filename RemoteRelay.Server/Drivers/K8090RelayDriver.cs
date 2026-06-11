@@ -37,11 +37,21 @@ public class K8090RelayDriver : IRelayDriver
             DtrEnable = true,
             RtsEnable = true
         };
-        _port.Open();
-        _logger.LogInformation("K8090 relay driver opened on {Port} (8 channels).", portName);
+        try
+        {
+            _port.Open();
+            SendCommand(CmdSwitchRelayOff, 0xFF);
+            _state = 0;
+        }
+        catch
+        {
+            // Release the COM port on any init failure, otherwise it stays locked
+            // until process exit and every subsequent open attempt fails too.
+            try { _port.Dispose(); } catch { /* best-effort */ }
+            throw;
+        }
 
-        SendCommand(CmdSwitchRelayOff, 0xFF);
-        _state = 0;
+        _logger.LogInformation("K8090 relay driver opened on {Port} (8 channels).", portName);
     }
 
     public string Name => "K8090";

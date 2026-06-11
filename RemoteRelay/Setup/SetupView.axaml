@@ -234,6 +234,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="25">
                             <CheckBox IsChecked="{Binding FlashOnSelect}" Content="Flash On Select"/>
                             <CheckBox IsChecked="{Binding ShowIpOnScreen}" Content="Show IP On Screen"/>
+                            <CheckBox IsChecked="{Binding ShowClockOnScreen}" Content="Show Clock On Screen"/>
                             <CheckBox IsChecked="{Binding Logging}" Content="Logging"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="10">

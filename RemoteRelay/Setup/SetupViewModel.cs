@@ -67,6 +67,13 @@ public class SetupViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _showIpOnScreen, value);
     }
 
+    private bool _showClockOnScreen = true;
+    public bool ShowClockOnScreen
+    {
+        get => _showClockOnScreen;
+        set => this.RaiseAndSetIfChanged(ref _showClockOnScreen, value);
+    }
+
     private bool _logging = true;
     public bool Logging
     {
@@ -304,6 +311,7 @@ public class SetupViewModel : ViewModelBase
         TcpMirrorPort = settings.TcpMirrorPort;
         FlashOnSelect = settings.FlashOnSelect;
         ShowIpOnScreen = settings.ShowIpOnScreen;
+        ShowClockOnScreen = settings.ShowClockOnScreen ?? true;
         Logging = settings.Logging;
         LogoFile = settings.LogoFile ?? string.Empty;
         ThemePalette = settings.ThemePalette ?? "Default";
@@ -464,6 +472,7 @@ public class SetupViewModel : ViewModelBase
             TcpMirrorPort = TcpMirrorPort,
             FlashOnSelect = FlashOnSelect,
             ShowIpOnScreen = ShowIpOnScreen,
+            ShowClockOnScreen = ShowClockOnScreen,
             Logging = Logging,
             LogoFile = LogoFile,
             ThemePalette = ThemePalette,

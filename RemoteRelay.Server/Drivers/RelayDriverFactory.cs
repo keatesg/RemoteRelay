@@ -61,7 +61,30 @@ public static class RelayDriverFactory
 
             case RelayDriverKind.K8090:
                 var port = settings.K8090?.Port ?? string.Empty;
-                return new K8090RelayDriver(port, logger);
+                // A config reload disposes the previous driver and immediately reopens the same
+                // COM port; on Windows the OS can briefly report it as still in use, so retry
+                // before giving up. Falling back to Mock keeps the server (and its UI/API)
+                // alive rather than leaving SwitcherState with no driver at all.
+                const int maxAttempts = 3;
+                for (var attempt = 1; ; attempt++)
+                {
+                    try
+                    {
+                        var k8090 = new K8090RelayDriver(port, logger);
+                        logger.LogInformation("Using K8090 relay driver on {Port}.", port);
+                        return k8090;
+                    }
+                    catch (Exception ex) when (attempt < maxAttempts)
+                    {
+                        logger.LogWarning(ex, "Failed to open K8090 on '{Port}' (attempt {Attempt}/{MaxAttempts}); retrying.", port, attempt, maxAttempts);
+                        Thread.Sleep(500);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to initialise K8090 driver on '{Port}' after {MaxAttempts} attempts; falling back to Mock. Relay switching is INOPERATIVE until the configuration is reloaded successfully.", port, maxAttempts);
+                        return new MockRelayDriver();
+                    }
+                }
 
             case RelayDriverKind.Mock:
             default:

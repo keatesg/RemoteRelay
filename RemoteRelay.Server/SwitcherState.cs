@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Device.Gpio;
 using System.Linq;
@@ -17,7 +18,8 @@ public class SwitcherState : IDisposable
     private readonly IHubContext<RelayHub> _hubContext;
     private readonly ILogger<SwitcherState> _logger;
     private readonly TcpMessageService _tcpMessageService;
-    private readonly Dictionary<int, DateTime> _lastPinEventTime = new();
+    // GPIO pin-change callbacks arrive on arbitrary threads, outside _stateLock.
+    private readonly ConcurrentDictionary<int, DateTime> _lastPinEventTime = new();
     private readonly object _stateLock = new();
     private static readonly TimeSpan _debounceTime = TimeSpan.FromMilliseconds(200);
     private static readonly TimeSpan _startupIgnoreTime = TimeSpan.FromMilliseconds(1500);

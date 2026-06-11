@@ -40,7 +40,8 @@
             </Viewbox>
 
             <!-- Date and Clock in top center -->
-            <Viewbox Grid.Column="1" HorizontalAlignment="Center" Stretch="Uniform">
+            <Viewbox Grid.Column="1" HorizontalAlignment="Center" Stretch="Uniform"
+                     IsVisible="{Binding ShowClockOnScreen}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="{Binding CurrentDate}"
                                FontSize="28"

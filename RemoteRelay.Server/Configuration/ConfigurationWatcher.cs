@@ -114,6 +114,17 @@ public class ConfigurationWatcher : IHostedService, IDisposable
                 settings.ServerPort = currentSettings.ServerPort;
             }
 
+            // Skip if the file matches what is already applied. Re-applying tears down and
+            // re-creates the relay driver, which physically drops every active relay, so a
+            // save made through the hub (which applies directly) or duplicate FileSystemWatcher
+            // events must not trigger a second apply.
+            if (JsonSerializer.Serialize(settings, _serializerOptions) ==
+                JsonSerializer.Serialize(currentSettings, _serializerOptions))
+            {
+                _logger.LogDebug("Configuration file change matches the currently applied settings; skipping reload.");
+                return;
+            }
+
             await _switcherState.ApplySettingsAsync(settings).ConfigureAwait(false);
             _logger.LogInformation("Configuration reload completed successfully.");
         }

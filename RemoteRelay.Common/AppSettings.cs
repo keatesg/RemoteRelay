@@ -81,6 +81,7 @@ public struct AppSettings
     public InactiveRelaySettings? InactiveRelay { get; set; }
     public bool FlashOnSelect { get; set; }
     public bool ShowIpOnScreen { get; set; }
+    public bool? ShowClockOnScreen { get; set; } // null treated as true so configs without the key keep the clock
     public bool Logging { get; set; }
     public string LogoFile { get; set; }
     public bool UseMockGpio { get; set; }

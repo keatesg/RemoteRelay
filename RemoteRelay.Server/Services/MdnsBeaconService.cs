@@ -27,39 +27,58 @@ public class MdnsBeaconService : BackgroundService
         _logger = logger;
     }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    private static readonly TimeSpan StartRetryDelay = TimeSpan.FromSeconds(10);
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = _switcherState.GetSettings();
         var port = settings.ServerPort;
 
         _logger.LogInformation("Starting mDNS beacon for _remoterelay._tcp.local. on port {Port}", port);
 
+        // Retry until the advertisement is up: at boot the service can start before
+        // the network is available, and giving up permanently breaks auto-discovery.
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                _serviceDiscovery = new ServiceDiscovery();
+                var profile = new ServiceProfile("RemoteRelay", "_remoterelay._tcp", (ushort)port);
+                _serviceDiscovery.Advertise(profile);
+
+                _logger.LogInformation("mDNS advertisement active.");
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to start mDNS beacon. Retrying in {Delay}s.", StartRetryDelay.TotalSeconds);
+                _serviceDiscovery?.Dispose();
+                _serviceDiscovery = null;
+
+                try
+                {
+                    await Task.Delay(StartRetryDelay, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+            }
+        }
+
         try
         {
-            _serviceDiscovery = new ServiceDiscovery();
-
-            // Advertise the service
-            var profile = new ServiceProfile("RemoteRelay", "_remoterelay._tcp", (ushort)port);
-            _serviceDiscovery.Advertise(profile);
-
-            _logger.LogInformation("mDNS advertisement active.");
-
-            // Keep reference alive
+            // Hold the advertisement until shutdown.
+            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
         {
-            _logger.LogError(ex, "Failed to start mDNS beacon");
+            // Normal shutdown
         }
-
-        // BackgroundService keeps running until pending task completes or cancellation
-        // Since we are just holding the reference, we can just wait indefinitely
-        var tcs = new TaskCompletionSource();
-        stoppingToken.Register(() =>
+        finally
         {
-            tcs.TrySetResult();
             _serviceDiscovery?.Dispose();
-        });
-
-        return tcs.Task;
+            _serviceDiscovery = null;
+        }
     }
 }

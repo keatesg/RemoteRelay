@@ -8,7 +8,6 @@
 set -e
 
 # --- Configuration ---
-SOLUTION_FILE="RemoteRelay.sln"
 CLIENT_PROJECT_FILE="RemoteRelay/RemoteRelay.csproj"
 SERVER_PROJECT_FILE="RemoteRelay.Server/RemoteRelay.Server.csproj"
 CONFIGURATION="Release"
@@ -83,12 +82,21 @@ echo "Cleanup complete."
 echo ""
 
 echo "Step 3: Restoring .NET dependencies..."
-dotnet restore "${SOLUTION_FILE}"
+# Only restore the client and server projects. Restoring the whole solution
+# would pull in the Windows-only WiX installer projects, which cannot build on Linux.
+dotnet restore "${CLIENT_PROJECT_FILE}"
+dotnet restore "${SERVER_PROJECT_FILE}"
 echo "Dependency restoration complete."
 echo ""
 
-echo "Step 4: Building solution (${CONFIGURATION} mode)..."
-dotnet build "${SOLUTION_FILE}" --configuration "${CONFIGURATION}" --no-restore
+echo "Step 4: Building client and server (${CONFIGURATION} mode)..."
+# Build only the client and server projects, not the solution. The solution
+# includes RemoteRelay.Installer (WiX) and RemoteRelay.Installer.CustomActions,
+# which are Windows-only and fail on Linux (WiX MakeSfxCA.exe is a Windows PE
+# binary -> "Exec format error"). The publish steps below produce the actual
+# Linux binaries; this build is a sanity check on the cross-platform projects.
+dotnet build "${CLIENT_PROJECT_FILE}" --configuration "${CONFIGURATION}" --no-restore
+dotnet build "${SERVER_PROJECT_FILE}" --configuration "${CONFIGURATION}" --no-restore
 echo "Build complete."
 echo ""
 

@@ -281,7 +281,7 @@ public class Program
         if (!File.Exists(configPath))
         {
             Console.WriteLine($"No configuration file found at '{configPath}'. Creating default (unconfigured) config.");
-            var defaults = new AppSettings { ServerPort = 33101, ShowIpOnScreen = true, FlashOnSelect = true, Logging = true };
+            var defaults = new AppSettings { ServerPort = 33101, ShowIpOnScreen = true, ShowClockOnScreen = true, FlashOnSelect = true, Logging = true };
             var defaultJson = JsonSerializer.Serialize(defaults, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
             File.WriteAllText(configPath, defaultJson);
         }

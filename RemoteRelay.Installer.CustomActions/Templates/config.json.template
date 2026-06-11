@@ -10,6 +10,7 @@
   },
   "FlashOnSelect": true,
   "ShowIpOnScreen": true,
+  "ShowClockOnScreen": true,
   "Logging": true,
   "LogoFile": "{{LOGO_FILE}}",
   "ThemePalette": "Default"
