@@ -23,4 +23,12 @@
     <EmbeddedResource Include="Templates\ClientConfig.json.template" />
   </ItemGroup>
 
+  <!-- Picked up by @(Content) in WixToolset.Dtf.CustomAction's PackCustomAction
+       target. MakeSfxCA recognises the name "CustomAction.config" and embeds it
+       as the CA host's app.config so the v4.0 CLR is loaded for this net472
+       assembly. -->
+  <ItemGroup>
+    <Content Include="CustomAction.config" />
+  </ItemGroup>
+
 </Project>

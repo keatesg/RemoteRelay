@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Fragment>
+    <UI>
+      <!-- Shown in the Remove flow (see WixUI_RemoteRelay_Overrides) to let the user
+           choose whether to also delete %ProgramData%\RemoteRelay (config + logs).
+           Default is to keep it. -->
+      <Dialog Id="RemoveConfigDlg" Width="370" Height="270" Title="[ProductName] Setup" NoMinimize="yes">
+
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
+                 TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="300" Height="15" Transparent="yes"
+                 Text="{\WixUI_Font_Title}Remove RemoteRelay" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes"
+                 Text="Choose what to do with your configuration." />
+
+        <Control Id="Info" Type="Text" X="20" Y="65" Width="330" Height="40" Transparent="yes"
+                 Text="Your settings and logs are stored in C:\ProgramData\RemoteRelay. By default they are kept so a future reinstall keeps your configuration." />
+
+        <Control Id="DeleteConfigCheckBox" Type="CheckBox" X="20" Y="115" Width="330" Height="18"
+                 Property="DELETE_CONFIG" CheckBoxValue="1"
+                 Text="Also delete my configuration and logs" />
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
+                 Text="&amp;Back" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17"
+                 Default="yes" Text="&amp;Next" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17"
+                 Cancel="yes" Text="Cancel" />
+      </Dialog>
+    </UI>
+  </Fragment>
+</Wix>

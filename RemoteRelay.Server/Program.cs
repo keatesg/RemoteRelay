@@ -16,7 +16,7 @@ namespace RemoteRelay.Server;
 
 public class Program
 {
-    private static readonly string ErrorLogPath = Path.Combine(AppContext.BaseDirectory, "server_error.log");
+    private static readonly string ErrorLogPath = AppPaths.ServerLogPath;
     private static readonly DateTime StartTime = DateTime.UtcNow;
 
     public static void Main(string[] args)
@@ -61,7 +61,7 @@ public class Program
                     return;
                 }
 
-                var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+                var configPath = AppPaths.ServerConfigPath;
                 AppSettings settings = File.Exists(configPath)
                     ? LoadInitialSettings(configPath)
                     : new AppSettings();
@@ -103,7 +103,7 @@ public class Program
 
     private static void RunWebServer(string[] args)
     {
-        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        var configPath = AppPaths.ServerConfigPath;
         var initialSettings = LoadInitialSettings(configPath);
 
         var builder = WebApplication.CreateBuilder(args);
@@ -299,9 +299,14 @@ public class Program
             throw new InvalidOperationException("Unable to deserialize configuration file into AppSettings.");
         }
 
-        if (!AppSettingsValidator.TryValidate(settings, out var summary))
+        if (!AppSettingsValidator.TryValidate(settings, out var summary, out var warnings))
         {
             throw new InvalidOperationException(summary);
+        }
+
+        foreach (var warning in warnings)
+        {
+            Console.WriteLine($"Configuration warning: {warning}");
         }
 
         return settings;

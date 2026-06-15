@@ -25,7 +25,9 @@ public class MainWindowViewModel : ViewModelBase
     private System.Timers.Timer? _retryTimer;
     private int _retryCountdown;
     private ClientConfig _clientConfig = new();
-    private const string ConfigFileName = "ClientConfig.json";
+    // On Windows this resolves to %ProgramData%\RemoteRelay\Client\ClientConfig.json; on
+    // Linux it stays in the install directory (see AppPaths).
+    private static readonly string ConfigFileName = AppPaths.ClientConfigPath;
     private AppSettings? _currentSettings;
     private IDisposable? _clientSubscriptions;
 

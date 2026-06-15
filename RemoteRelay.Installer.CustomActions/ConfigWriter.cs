@@ -73,6 +73,26 @@ namespace RemoteRelay.Installer.CustomActions
             }
         }
 
+        [CustomAction]
+        public static ActionResult RemoveConfig(Session session)
+        {
+            try
+            {
+                var folder = session.CustomActionData["DataFolder"];
+                if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder))
+                {
+                    Directory.Delete(folder, recursive: true);
+                    session.Log("Removed configuration folder: {0}", folder);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Never block uninstall on cleanup failure (CA is Return=ignore anyway).
+                session.Log("RemoveConfig failed (ignored): {0}", ex);
+            }
+            return ActionResult.Success;
+        }
+
         private static string LoadTemplate(string resourceName)
         {
             var assembly = Assembly.GetExecutingAssembly();

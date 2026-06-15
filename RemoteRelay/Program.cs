@@ -3,12 +3,13 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.ReactiveUI;
+using RemoteRelay.Common;
 
 namespace RemoteRelay;
 
 internal class Program
 {
-    private static readonly string ErrorLogPath = Path.Combine(AppContext.BaseDirectory, "client_error.log");
+    private static readonly string ErrorLogPath = AppPaths.ClientLogPath;
 
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized

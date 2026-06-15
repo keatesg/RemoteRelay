@@ -12,6 +12,23 @@
     <UI Id="WixUI_RemoteRelay_Overrides">
       <DialogRef Id="ServerConfigDlg" />
       <DialogRef Id="ClientConfigDlg" />
+      <DialogRef Id="RemoveConfigDlg" />
+
+      <!-- Remove flow: intercept the MaintenanceTypeDlg Remove button so the user can
+           choose to keep or delete config before VerifyReadyDlg. Higher Order than the
+           ext's default NewDialog->VerifyReadyDlg publish, so this wins. -->
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog"
+               Value="RemoveConfigDlg" Order="10" Condition="1" />
+      <Publish Dialog="RemoveConfigDlg" Control="Back" Event="NewDialog"
+               Value="MaintenanceTypeDlg" />
+      <Publish Dialog="RemoveConfigDlg" Control="Next" Event="NewDialog"
+               Value="VerifyReadyDlg" />
+      <Publish Dialog="RemoveConfigDlg" Control="Cancel" Event="SpawnDialog"
+               Value="CancelDlg" />
+      <!-- When VerifyReadyDlg is reached via the Remove flow, send Back to our dialog. -->
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog"
+               Value="RemoveConfigDlg" Order="10"
+               Condition="WixUI_InstallMode = &quot;Remove&quot;" />
 
       <!-- After CustomizeDlg (feature tree): branch on which features are selected. -->
       <Publish Dialog="CustomizeDlg" Control="Next" Event="NewDialog"

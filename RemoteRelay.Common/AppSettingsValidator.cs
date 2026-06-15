@@ -7,15 +7,28 @@ namespace RemoteRelay.Common;
 public static class AppSettingsValidator
 {
     public static bool TryValidate(AppSettings settings, out string validationSummary)
+        => TryValidate(settings, out validationSummary, out _);
+
+    /// <summary>
+    /// Validates the settings, separating fatal <paramref name="validationSummary"/> errors
+    /// (which should prevent startup) from non-fatal <paramref name="warnings"/> (e.g. an
+    /// as-yet-unconfigured relay port). A missing relay port is a warning, not an error: the
+    /// server still starts and serves its UI/API, the relay driver falls back to Mock, and the
+    /// ConfigurationWatcher picks up a valid port live once one is set.
+    /// </summary>
+    public static bool TryValidate(AppSettings settings, out string validationSummary, out IReadOnlyList<string> warnings)
     {
         var errors = new List<string>();
+        var warningList = new List<string>();
 
         ValidateRoutes(settings, errors);
         ValidateServerPort(settings, errors);
         ValidateDefaultRoutes(settings, errors);
         ValidatePhysicalButtons(settings, errors);
         ValidateInactiveRelay(settings, errors);
-        ValidateRelayDriver(settings, errors);
+        ValidateRelayDriver(settings, errors, warningList);
+
+        warnings = warningList;
 
         if (errors.Count == 0)
         {
@@ -156,7 +169,7 @@ public static class AppSettingsValidator
         }
     }
 
-    private static void ValidateRelayDriver(AppSettings settings, List<string> errors)
+    private static void ValidateRelayDriver(AppSettings settings, List<string> errors, List<string> warnings)
     {
         var driver = settings.RelayDriver?.Trim();
         if (string.IsNullOrEmpty(driver) || string.Equals(driver, "Auto", StringComparison.OrdinalIgnoreCase))
@@ -176,7 +189,7 @@ public static class AppSettingsValidator
         {
             if (string.IsNullOrWhiteSpace(settings.K8090?.Port))
             {
-                errors.Add("RelayDriver is 'K8090' but K8090.Port is not set in config.");
+                warnings.Add("RelayDriver is 'K8090' but K8090.Port is not set; relay switching will be inoperative until a port is configured in config.json.");
             }
 
             if (settings.Routes != null)

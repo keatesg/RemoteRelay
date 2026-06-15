@@ -33,35 +33,60 @@ Available COM ports are enumerated at install time via `System.IO.Ports.SerialPo
 
 ## Where the configuration files end up
 
-- Server: `C:\Program Files\RemoteRelay\Server\config.json`
-- Client: `C:\Program Files\RemoteRelay\Client\ClientConfig.json`
+Configuration and logs live under **`C:\ProgramData\RemoteRelay`**, *not* in Program Files:
 
-Both files are **only written if they don't already exist**, so reinstalls and upgrades won't overwrite hand-edited configuration. To regenerate them, uninstall and reinstall, or delete the file before reinstalling.
+- Server: `C:\ProgramData\RemoteRelay\Server\config.json` (+ `server_error.log`)
+- Client: `C:\ProgramData\RemoteRelay\Client\ClientConfig.json` (+ `client_error.log`)
+
+This keeps mutable data out of Program Files: it's machine-wide, survives a reinstall, and the installer grants **Users** Modify on the folder so a non-admin can edit config without elevation. (On Linux the config still lives next to the binary — only Windows uses `ProgramData`.)
+
+The config files are **only written if they don't already exist**, so reinstalls and upgrades won't overwrite hand-edited configuration. To regenerate them, delete the file (or uninstall with the "delete configuration" option) and reinstall.
 
 ## Updating
 
 The MSI's `ProductVersion` is stamped from the release tag in CI, and the
 package uses `MajorUpgrade`, so installing a newer `RemoteRelay-Setup.msi`
 performs a clean in-place upgrade: the service is stopped, files are replaced,
-configuration is preserved, and the service is restarted. Downgrades are blocked
+configuration is preserved (it lives in `ProgramData`, separate from the
+replaced binaries), and the service is restarted. Downgrades are blocked
 with a clear message. (Local builds default to version `1.0.0.0` unless you pass
 `-p:BuildVersion=<x.y.z>`.)
 
 For the full schema of each file, see [Server_Configuration.md](Server_Configuration.md) and [Client_Configuration.md](Client_Configuration.md). The installer wizard only captures the most common fields; everything else can be edited directly in the JSON files after install. The server's `ConfigurationWatcher` picks up changes to `config.json` without restarting the service.
 
-## Managing the Server service
+## Uninstalling
+
+Uninstalling **keeps your configuration and logs by default** (so a later reinstall
+keeps your settings). The uninstall wizard offers an **"Also delete my configuration
+and logs"** checkbox to wipe `C:\ProgramData\RemoteRelay`. To do the same
+non-interactively:
 
 ```powershell
-# Status
+msiexec /x RemoteRelay-Setup.msi DELETE_CONFIG=1
+```
+
+## Managing the Server service
+
+If you installed only the **Server** (no client GUI on the box), the Start Menu
+folder **RemoteRelay** gives you everything you need:
+
+- **Edit RemoteRelay Server Config** — opens `config.json` in Notepad (no elevation needed; changes are hot-reloaded by the service).
+- **RemoteRelay Server Logs** — opens `server_error.log`.
+- **Restart RemoteRelay Server** — restarts the service (prompts for elevation).
+
+These shortcuts run `Manage-RemoteRelayServer.ps1` (in the Server install folder),
+which you can also call directly: `-Action Status|Start|Stop|Restart|EditConfig|Logs`.
+
+You can also manage settings from a **RemoteRelay client on another machine** pointed
+at the server: its Setup page writes the server's `config.json` over the connection
+and the change is applied live.
+
+Or use the service directly from PowerShell:
+
+```powershell
 Get-Service RemoteRelayServer
-
-# Stop / start / restart
-Stop-Service RemoteRelayServer
-Start-Service RemoteRelayServer
-Restart-Service RemoteRelayServer
-
-# Logs go to the install folder
-Get-Content 'C:\Program Files\RemoteRelay\Server\server_error.log' -Tail 50
+Restart-Service RemoteRelayServer       # needs an elevated shell
+Get-Content 'C:\ProgramData\RemoteRelay\Server\server_error.log' -Tail 50
 ```
 
 The service runs as **LocalSystem** so it has access to COM ports for the K8090 driver without extra ACL configuration.
