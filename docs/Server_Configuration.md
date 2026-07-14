@@ -1,6 +1,6 @@
 # Server Configuration
 
-The server is configured using the `config.json` file located in the same directory as the server executable. This file defines the relay routing, GPIO pin mappings, physical button inputs, and various server options.
+The server is configured using the `config.json` file located in the same directory as the server executable. This file defines the relay routing, the relay driver, GPIO pin mappings, physical button inputs, and various server options.
 
 ## Configuration File Location
 
@@ -16,6 +16,40 @@ the original alongside as `config.json.pre-migration`. Files without the key
 (pre-versioning releases) are stamped on first load. You don't need to manage
 this value; it exists so future releases can change the config shape without
 breaking existing installs.
+
+## Relay Driver
+
+The `RelayDriver` key selects which relay hardware the server drives:
+
+| Value | Hardware |
+| --- | --- |
+| `"Auto"` (default) | Auto-detect: Raspberry Pi GPIO when `/sys/class/gpio` is present, otherwise Mock. |
+| `"RpiGpio"` | Raspberry Pi GPIO header (also accepts `"Gpio"`, `"Rpi"`). |
+| `"K8090"` | Velleman K8090 / VM8090 8-channel USB relay card (also accepts `"Velleman"`). |
+| `"Mock"` | No hardware; logs switches only. Useful for testing. |
+
+```json
+"RelayDriver": "K8090",
+"K8090": {
+  "Port": "COM3"
+}
+```
+
+- If `RelayDriver` is omitted or set to `"Auto"`, the legacy auto-detect behaviour applies (the older `UseMockGpio` flag still forces Mock).
+- The driver is applied live: editing `RelayDriver` or `K8090.Port` reloads the driver without restarting the server.
+
+### K8090 (Velleman USB relay card)
+
+Required when `RelayDriver` is `"K8090"`.
+
+- `Port` (string): the serial port the card enumerates as — e.g. `COM3` on Windows, `/dev/ttyACM0` on Linux. The Windows installer offers a dropdown of detected COM ports; the Linux `remoterelay.sh` config menu lists detected serial devices.
+
+With the K8090 driver a route's `RelayPin` is the **relay channel (1–8)** on the card, not a GPIO pin. `ActiveLow` and the `InactiveRelay` polarity settings (`InactiveState`) are GPIO concepts and are **ignored** — the K8090's relays energise when switched on and release when switched off, so wire the normally-open or normally-closed contacts to choose the resting state.
+
+The driver connects to the card on a background thread and keeps hardware and software in step:
+
+- **Auto-reconnect** — if the card is absent at startup, unplugged, or power-cycled, the driver keeps retrying and reconnects on its own. No config reload is needed, and a source switched while the card is offline is remembered and applied the moment it returns.
+- **Status polling / drift detection** — the driver periodically reads the card's actual relay states. If they diverge from what RemoteRelay intends (a dropped command, or the card's own on-board buttons/timers), it logs a warning and re-asserts the intended state. Software routing is authoritative.
 
 ## Complete Configuration Example
 
@@ -52,6 +86,7 @@ breaking existing installs.
     "Input 2": "#FF2E8B57"
   },
   "ServerPort": 33101,
+  "RelayDriver": "Auto",
   "TcpMirrorAddress": null,
   "TcpMirrorPort": null,
   "InactiveRelay": {
@@ -86,8 +121,8 @@ An array defining all possible source-to-output connections and their correspond
 **Properties:**
 - `SourceName` (string): The name of the input source (e.g., "Input 1", "Studio A", "CD Player")
 - `OutputName` (string): The name of the output destination (e.g., "Output 1", "Transmitter", "Monitor")
-- `RelayPin` (integer): The GPIO pin number (BCM numbering) that controls this relay
-- `ActiveLow` (boolean): 
+- `RelayPin` (integer): The relay this route controls. With the GPIO driver this is the GPIO pin number (BCM numbering); with the [K8090 driver](#k8090-velleman-usb-relay-card) it is the relay channel (`1`–`8`).
+- `ActiveLow` (boolean): GPIO driver only (ignored by K8090)
   - `true`: Relay activates when pin is LOW (common for most relay HATs)
   - `false`: Relay activates when pin is HIGH
 
@@ -291,6 +326,10 @@ The server validates the configuration on startup and will report errors if:
 - GPIO pin numbers are invalid or duplicated
 - Source/output names are referenced inconsistently
 - TcpMirror settings are incomplete
+- `RelayDriver` is not a recognised value
+- The driver is `K8090` but a route channel or the inactive relay is outside `1`–`8`
+
+A missing `K8090.Port` is a **warning**, not an error: the server still starts and serves its UI/API, and switching becomes operative as soon as a valid port is set (the change is picked up live).
 
 Check the server console output for validation messages.
 
