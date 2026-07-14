@@ -139,6 +139,28 @@ DL_SIZE="$(stat -c%s "$INSTALLER" 2>/dev/null || stat -f%z "$INSTALLER" 2>/dev/n
 chmod +x "$INSTALLER"
 ok "Downloaded ($((DL_SIZE / 1024 / 1024)) MB)"
 
+# --- verify integrity against the release's SHA256SUMS manifest ----------------
+# Older releases don't ship one; warn and continue in that case.
+SUMS_URL="$(printf '%s' "$RELEASE_JSON" \
+  | jq -r '.assets[]? | select(.name == "SHA256SUMS") | .browser_download_url' \
+  | head -n1)"
+if [ -n "$SUMS_URL" ] && [ "$SUMS_URL" != "null" ]; then
+  ASSET_NAME="$(basename "$ASSET_URL")"
+  EXPECTED="$(curl -fsSL "$SUMS_URL" | awk -v f="$ASSET_NAME" '$2 == f { print $1 }')"
+  if [ -z "$EXPECTED" ]; then
+    warn "No entry for $ASSET_NAME in SHA256SUMS — skipping checksum verification."
+  else
+    ACTUAL="$(sha256sum "$INSTALLER" | awk '{ print $1 }')"
+    [ "$ACTUAL" = "$EXPECTED" ] || die "Checksum mismatch for $ASSET_NAME
+    expected: $EXPECTED
+    actual  : $ACTUAL
+  The download may be corrupt or tampered with — not installing."
+    ok "Checksum verified"
+  fi
+else
+  warn "Release ${TAG:-?} has no SHA256SUMS manifest — skipping checksum verification."
+fi
+
 say "Launching installer…"
 # Export so the makeself-extracted install.sh inherits the headless flag.
 export RR_UNATTENDED="${RR_UNATTENDED:-0}"

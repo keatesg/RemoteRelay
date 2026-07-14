@@ -28,6 +28,13 @@ public static class AppSettingsValidator
         ValidateInactiveRelay(settings, errors);
         ValidateRelayDriver(settings, errors, warningList);
 
+        if (settings.ConfigVersion > AppSettings.CurrentConfigVersion)
+        {
+            warningList.Add(
+                $"Configuration schema v{settings.ConfigVersion} is newer than this build supports (v{AppSettings.CurrentConfigVersion}). " +
+                "It was probably written by a newer release; settings this build doesn't know about will be ignored.");
+        }
+
         warnings = warningList;
 
         if (errors.Count == 0)

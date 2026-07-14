@@ -17,6 +17,14 @@ public class ClientConfig
     public bool? IsFullscreen { get; set; } = true;
 
     /// <summary>
+    /// Cache of the last auto-discovered server, used as a fallback when mDNS
+    /// discovery fails at startup. Only consulted while Host is empty
+    /// (auto-discover mode); an explicit Host always wins.
+    /// </summary>
+    public string? LastDiscoveredHost { get; set; }
+    public int? LastDiscoveredPort { get; set; }
+
+    /// <summary>
     /// Returns true if the host is localhost, 127.0.0.1, or matches
     /// any of this machine's own IPv4 addresses (covers auto-discovery).
     /// </summary>

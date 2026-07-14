@@ -1,0 +1,82 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:connection="clr-namespace:RemoteRelay.Connection"
+             x:Class="RemoteRelay.Connection.ConnectionSettingsView"
+             x:DataType="connection:ConnectionSettingsViewModel">
+
+    <DockPanel Background="#1E1E1E">
+        <!-- Header -->
+        <Border DockPanel.Dock="Top" Background="#007ACC" Padding="15">
+            <DockPanel>
+                <Button Content="✕ Cancel"
+                        DockPanel.Dock="Right"
+                        Command="{Binding CancelCommand}"
+                        Background="Transparent"
+                        Foreground="White"/>
+                <TextBlock Text="Connection Settings"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="White"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Footer with Save -->
+        <Border DockPanel.Dock="Bottom" Background="#2D2D30" Padding="15">
+            <DockPanel>
+                <Button Content="💾 Save &amp; Connect"
+                        DockPanel.Dock="Right"
+                        Command="{Binding SaveCommand}"
+                        Background="#0E639C"
+                        Foreground="White"
+                        Padding="20,10"/>
+                <TextBlock Text="{Binding StatusMessage}"
+                           VerticalAlignment="Center"
+                           Foreground="#CCCCCC"
+                           TextWrapping="Wrap"/>
+            </DockPanel>
+        </Border>
+
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Padding="20">
+            <StackPanel Spacing="8" MaxWidth="600">
+
+                <TextBlock Text="═══ Server Address ═══" FontWeight="Bold" FontSize="16" Margin="0,0,0,8"/>
+                <Border Background="#2D2D30" CornerRadius="8" Padding="15">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="Host:" VerticalAlignment="Center"/>
+                            <TextBox Text="{Binding Host}" PlaceholderText="blank = auto-discover" Width="240"/>
+                            <TextBlock Text="Port:" VerticalAlignment="Center"/>
+                            <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535"
+                                           PlaceholderText="33101" FormatString="0" Width="130"/>
+                        </StackPanel>
+                        <TextBlock Text="Leave the host blank to find the server automatically on this network."
+                                   Foreground="#999999" FontSize="12" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <DockPanel Margin="0,15,0,0">
+                    <Button Content="🔍 Scan Again"
+                            DockPanel.Dock="Right"
+                            Command="{Binding ScanCommand}"
+                            IsEnabled="{Binding !IsScanning}"
+                            Padding="10,5"/>
+                    <TextBlock Text="═══ Servers On This Network ═══" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                </DockPanel>
+                <Border Background="#2D2D30" CornerRadius="8" Padding="8" MinHeight="110">
+                    <ListBox ItemsSource="{Binding DiscoveredServers}"
+                             SelectedItem="{Binding SelectedServer}"
+                             Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type connection:DiscoveredServer}">
+                                <TextBlock Text="{Binding Display}" Padding="8"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -287,6 +288,8 @@ public class Program
         }
 
         var json = File.ReadAllText(configPath);
+        json = MigrateConfigIfNeeded(configPath, json);
+
         var settings = JsonSerializer.Deserialize<AppSettings>(json, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
@@ -310,6 +313,42 @@ public class Program
         }
 
         return settings;
+    }
+
+    /// <summary>
+    /// Runs ConfigMigrator over the raw config document and, if it changed,
+    /// rewrites the file (keeping a .pre-migration backup) and returns the
+    /// upgraded JSON. Runs before the ConfigurationWatcher starts, so the
+    /// rewrite can't trigger a reload. Any failure here is non-fatal: the
+    /// original text is returned and deserialization reports real problems.
+    /// </summary>
+    private static string MigrateConfigIfNeeded(string configPath, string json)
+    {
+        try
+        {
+            var documentOptions = new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            };
+
+            if (JsonNode.Parse(json, null, documentOptions) is not JsonObject configObject ||
+                !ConfigMigrator.Migrate(configObject))
+            {
+                return json;
+            }
+
+            File.Copy(configPath, configPath + ".pre-migration", overwrite: true);
+            var upgraded = configObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(configPath, upgraded);
+            Console.WriteLine($"Configuration upgraded to schema v{AppSettings.CurrentConfigVersion} (previous file kept at {configPath}.pre-migration).");
+            return upgraded;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Configuration migration skipped: {ex.Message}");
+            return json;
+        }
     }
 
     private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)

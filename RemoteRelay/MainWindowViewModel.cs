@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using ReactiveUI;
 using RemoteRelay.Common;
+using RemoteRelay.Connection;
 using RemoteRelay.MultiOutput;
 using RemoteRelay.Setup;
 using RemoteRelay.SingleOutput;
@@ -99,6 +100,12 @@ public class MainWindowViewModel : ViewModelBase
 
     public ICommand OpenSetupCommand { get; }
 
+    public ICommand OpenConnectionSettingsCommand { get; }
+
+    // Set once the connection settings view has been offered this session, so a
+    // failing first-run connection doesn't keep bouncing the dialog at the user.
+    private bool _connectionPromptShown;
+
     public MainWindowViewModel()
     {
         Debug.WriteLine(Guid.NewGuid());
@@ -109,8 +116,7 @@ public class MainWindowViewModel : ViewModelBase
         ShowSetupButton = _clientConfig.IsLocalConnection;
 
         OpenSetupCommand = ReactiveCommand.Create(OpenSetup);
-
-        OpenSetupCommand = ReactiveCommand.Create(OpenSetup);
+        OpenConnectionSettingsCommand = ReactiveCommand.Create(OpenConnectionSettings);
 
         InitClient();
 
@@ -135,8 +141,8 @@ public class MainWindowViewModel : ViewModelBase
             .Subscribe(settings =>
             {
                 _currentSettings = settings;
-                // Only apply if we're not in setup mode
-                if (OperationViewModel is not SetupViewModel)
+                // Only apply if the user isn't editing setup or connection settings
+                if (OperationViewModel is not SetupViewModel and not ConnectionSettingsViewModel)
                 {
                     ApplySettings(settings);
                 }
@@ -204,6 +210,49 @@ public class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private void OpenConnectionSettings()
+    {
+        _connectionPromptShown = true;
+        StopRetryTimer();
+        OperationViewModel = new ConnectionSettingsViewModel(
+            _clientConfig.Host,
+            _clientConfig.Port,
+            onSave: (host, port) => _ = ApplyConnectionSettingsAsync(host, port),
+            onCancel: CancelConnectionSettings);
+        ServerStatusMessage = "Editing connection settings…";
+    }
+
+    private async Task ApplyConnectionSettingsAsync(string? host, int? port)
+    {
+        _clientConfig.Host = host ?? string.Empty;
+        _clientConfig.Port = port;
+        // A newly chosen server invalidates the cached discovery result.
+        _clientConfig.LastDiscoveredHost = null;
+        _clientConfig.LastDiscoveredPort = null;
+        SaveConfig();
+
+        ShowSetupButton = _clientConfig.IsLocalConnection;
+        OperationViewModel = null;
+
+        DisposeClientSubscriptions();
+        await SwitcherClient.ResetInstanceAsync();
+        InitClient();
+        await InitializeConnectionAsync();
+    }
+
+    private void CancelConnectionSettings()
+    {
+        OperationViewModel = null;
+        if (SwitcherClient.Instance.IsConnected)
+        {
+            _ = OnConnected();
+        }
+        else
+        {
+            StartRetryTimer();
+        }
+    }
+
     private void LoadOrMigrateConfig()
     {
         if (File.Exists(ConfigFileName))
@@ -266,8 +315,11 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task InitializeConnectionAsync()
     {
+        var autoMode = string.IsNullOrWhiteSpace(_clientConfig.Host);
+        var discovered = false;
+
         // Auto-discovery if configured for localhost or empty host
-        if (string.IsNullOrWhiteSpace(_clientConfig.Host) || _clientConfig.IsLocalConnection)
+        if (autoMode || _clientConfig.IsLocalConnection)
         {
             ServerStatusMessage = "Scanning for RemoteRelay server...";
             try
@@ -285,6 +337,17 @@ public class MainWindowViewModel : ViewModelBase
                     {
                         var newHost = ip.ToString();
                         var newPort = service.Port;
+                        discovered = true;
+
+                        // Cache the result so a later launch can still connect when
+                        // mDNS is down. Host stays empty, so discovery keeps running
+                        // first on every launch — the cache is only a fallback.
+                        if (_clientConfig.LastDiscoveredHost != newHost || _clientConfig.LastDiscoveredPort != newPort)
+                        {
+                            _clientConfig.LastDiscoveredHost = newHost;
+                            _clientConfig.LastDiscoveredPort = newPort;
+                            SaveConfig();
+                        }
 
                         // Only re-initialize if it differs from what we would use by default
                         var currentHost = string.IsNullOrWhiteSpace(_clientConfig.Host) ? "localhost" : _clientConfig.Host;
@@ -293,7 +356,6 @@ public class MainWindowViewModel : ViewModelBase
                         {
                             ServerStatusMessage = $"Found server at {newHost}:{newPort}. Connecting...";
 
-                            // Do NOT save the discovered Host and Port to _clientConfig so it discovers again next time
                             // Re-initialize client with discovered host and port
                             DisposeClientSubscriptions();
                             await SwitcherClient.ResetInstanceAsync();
@@ -306,11 +368,29 @@ public class MainWindowViewModel : ViewModelBase
             {
                 Debug.WriteLine($"Auto-discovery failed: {ex.Message}");
             }
+
+            // Nothing discovered: fall back to the server discovery last found, so
+            // a temporary mDNS outage doesn't strand an auto-configured client.
+            if (!discovered && autoMode && !string.IsNullOrWhiteSpace(_clientConfig.LastDiscoveredHost))
+            {
+                var cachedHost = _clientConfig.LastDiscoveredHost!;
+                var cachedPort = _clientConfig.LastDiscoveredPort ?? 33101;
+                ServerStatusMessage = $"No server discovered. Trying last known server {cachedHost}:{cachedPort}...";
+                DisposeClientSubscriptions();
+                await SwitcherClient.ResetInstanceAsync();
+                InitClient(cachedHost, cachedPort);
+            }
         }
 
         if (await SwitcherClient.Instance.ConnectAsync())
         {
             await OnConnected();
+        }
+        else if (autoMode && !discovered && !_connectionPromptShown)
+        {
+            // Nothing configured, nothing discovered, and the connection failed —
+            // ask the user rather than silently retrying localhost forever.
+            Dispatcher.UIThread.Post(OpenConnectionSettings);
         }
         else
         {
@@ -415,6 +495,14 @@ public class MainWindowViewModel : ViewModelBase
         }
 
         StopRetryTimer();
+
+        if (OperationViewModel is ConnectionSettingsViewModel)
+        {
+            // The user is editing connection settings — don't yank the view away.
+            // Cancel/Save will re-apply the current settings when they're done.
+            ServerStatusMessage = $"Connected to {SwitcherClient.Instance.ServerUri}";
+            return;
+        }
 
         ServerStatusMessage = $"Connected to {SwitcherClient.Instance.ServerUri}. Fetching settings...";
         SwitcherClient.Instance.RequestSettings();

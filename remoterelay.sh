@@ -9,7 +9,8 @@
 #   sudo remoterelay                 open the interactive menu
 #   sudo remoterelay status          print status
 #   sudo remoterelay start|stop|restart|enable|disable
-#   sudo remoterelay update [--pre-release|--force]
+#   sudo remoterelay update [--pre-release|--force|--version <tag>]
+#   sudo remoterelay rollback        return to the previously installed version
 #   sudo remoterelay config          open the configuration menu
 #   sudo remoterelay logs            view server logs
 #   sudo remoterelay uninstall
@@ -159,22 +160,39 @@ do_update() { run_updater "$@"; }
 
 maintenance_menu() {
   while :; do
+    local rollback_desc="Return to the previously installed version"
+    if rr_read_rollback_conf 2>/dev/null; then
+      rollback_desc="Roll back to version $RR_ROLLBACK_VERSION"
+    fi
     local choice
     choice="$(ui_menu "Update & maintenance" "Installed server version: $(rr_binary_version "$SERVER_INSTALL_DIR/RemoteRelay.Server")" \
       stable    "Check for and install the latest stable release" \
       pre       "Install the latest pre-release" \
       repair    "Reinstall the current release (repair)" \
+      rollback  "$rollback_desc" \
       uninstall "Uninstall RemoteRelay" \
       back      "Back")" || return 0
     case "$choice" in
       stable) run_updater ;;
       pre)    run_updater --pre-release ;;
       repair) run_updater --force ;;
+      rollback) do_rollback ;;
       uninstall) do_uninstall ;;
       back|"") return 0 ;;
     esac
     [ "$RR_INTERACTIVE" = 1 ] || return 0
   done
+}
+
+do_rollback() {
+  if ! rr_read_rollback_conf 2>/dev/null; then
+    ui_error "Nothing to roll back to — no previous update has been recorded."
+    return 1
+  fi
+  if [ "$RR_INTERACTIVE" = 1 ]; then
+    ui_yesno "Roll back" "Reinstall version $RR_ROLLBACK_VERSION and restore the configuration from before the last update?" || return 0
+  fi
+  run_updater --rollback
 }
 
 # --- configuration ------------------------------------------------------------
@@ -437,7 +455,8 @@ Commands:
   status              print system status
   start|stop|restart  control the server service
   enable|disable      control start-at-boot
-  update [--pre-release|--force]
+  update [--pre-release|--force|--version <tag>]
+  rollback            return to the previously installed version
   config              open the configuration menu
   logs                view server logs
   uninstall           remove RemoteRelay
@@ -461,6 +480,7 @@ case "$cmd" in
   start|stop|restart|enable|disable) svc "$cmd" ;;
   service)                           service_menu ;;
   update)                            shift; do_update "$@" ;;
+  rollback)                          do_rollback ;;
   config|configure)                  config_menu ;;
   logs|log)                          do_logs ;;
   uninstall)                         do_uninstall ;;

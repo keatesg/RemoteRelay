@@ -2,10 +2,24 @@
 
 The RemoteRelay client is configured using the `ClientConfig.json` file. This file defines the server connection details and controls which inputs and outputs are visible in the user interface.
 
+## In-App Connection Settings
+
+The server connection no longer requires editing JSON by hand. The
+**🔗 Connection** button in the client opens a dialog where you can:
+
+- scan the local network for RemoteRelay servers (mDNS) and pick one, or
+- enter a host/port manually, or
+- leave the host blank to keep automatic discovery.
+
+The dialog also opens automatically on first run when nothing is configured
+and no server can be found. Saved choices are written to `ClientConfig.json`,
+so everything below still applies if you prefer to edit the file directly.
+
 ## Configuration File Location
 
 - **Development**: `RemoteRelay/ServerDetails.json` (legacy) or `ClientConfig.json`
-- **Installed**: Same directory as the `RemoteRelay` executable, named `ClientConfig.json`
+- **Installed (Linux)**: Same directory as the `RemoteRelay` executable, named `ClientConfig.json`
+- **Installed (Windows)**: `%ProgramData%\RemoteRelay\Client\ClientConfig.json`
 
 ## Configuration File Format
 
@@ -26,16 +40,19 @@ The RemoteRelay client is configured using the `ClientConfig.json` file. This fi
 
 ## Configuration Properties
 
-### Host (Required)
+### Host (Optional)
 
-The IP address or hostname of the RemoteRelay server.
+The IP address or hostname of the RemoteRelay server. When empty or omitted
+(or set to `localhost`), the client auto-discovers the server on the local
+network via mDNS at startup.
 
 ```json
 "Host": "192.168.1.100"
 ```
 
 **Examples:**
-- `"localhost"` - Connect to server on the same machine
+- `""` - Auto-discover the server on the local network
+- `"localhost"` - Connect to server on the same machine (also triggers discovery)
 - `"192.168.1.100"` - Connect to server at specific IP address
 - `"relay.example.com"` - Connect using hostname/domain
 - `"10.0.0.5"` - Connect to server on local network
@@ -94,6 +111,14 @@ An array of output names to display in the client UI. Only outputs listed here w
 **UI Modes:**
 - **Single Output Mode**: If only one output is shown (or ShownOutputs has one item), displays simplified UI with large buttons
 - **Multi Output Mode**: If multiple outputs are shown, displays each output as a separate section with its own source buttons
+
+### LastDiscoveredHost / LastDiscoveredPort (Managed automatically)
+
+When auto-discovery finds a server, the client caches its address in these
+properties. If a later launch can't discover a server (e.g. mDNS is blocked or
+temporarily down), the client falls back to this cached address. You never
+need to set these by hand, and they are ignored whenever `Host` is set
+explicitly.
 
 ## Example Configurations
 

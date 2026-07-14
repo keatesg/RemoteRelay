@@ -63,6 +63,20 @@ public class InactiveRelaySettings
 [Serializable]
 public struct AppSettings
 {
+    /// <summary>
+    /// The config.json schema version this build writes. Bump it and add a step
+    /// in ConfigMigrator whenever the schema changes shape.
+    /// </summary>
+    public const int CurrentConfigVersion = 1;
+
+    /// <summary>
+    /// Schema version the loaded file was written with. In the raw JSON a
+    /// missing value means the file predates versioning; ConfigMigrator reads
+    /// the version from the document, so don't rely on this property to detect
+    /// old files — the constructor defaults it to CurrentConfigVersion.
+    /// </summary>
+    public int ConfigVersion { get; set; }
+
     //Sources
     public List<RelayConfig> Routes { get; set; }
     public string? DefaultSource { get; set; }
@@ -92,6 +106,7 @@ public struct AppSettings
     // Parameterless constructor for struct initialization
     public AppSettings()
     {
+        ConfigVersion = CurrentConfigVersion;
         PhysicalSourceButtons = new Dictionary<string, PhysicalButtonConfig>();
         DefaultRoutes = new Dictionary<string, string>();
         SourceColorPalette = new Dictionary<string, string>();

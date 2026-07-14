@@ -5,6 +5,7 @@
         xmlns:multiOutput="clr-namespace:RemoteRelay.MultiOutput"
         xmlns:controls="clr-namespace:RemoteRelay.Controls"
         xmlns:setup="clr-namespace:RemoteRelay.Setup"
+        xmlns:connection="clr-namespace:RemoteRelay.Connection"
         x:Class="RemoteRelay.MainWindow"
         Title="SourceSwitcher"
         Width="600" Height="300"
@@ -22,6 +23,9 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type setup:SetupViewModel}">
             <setup:SetupView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type connection:ConnectionSettingsViewModel}">
+            <connection:ConnectionSettingsView />
         </DataTemplate>
     </Window.DataTemplates>
 
@@ -42,13 +46,19 @@
                  IsVisible="{Binding ShowIpOnScreen}">
             <TextBlock Text="{Binding ServerStatusMessage}" />
         </Viewbox>
-        <Button Content="⚙ Setup"
-                DockPanel.Dock="Bottom"
-                Command="{Binding OpenSetupCommand}"
-                IsVisible="{Binding ShowSetupButton}"
-                HorizontalAlignment="Right"
-                Margin="10"
-                Padding="15,8"/>
+        <DockPanel DockPanel.Dock="Bottom" LastChildFill="False">
+            <Button Content="🔗 Connection"
+                    DockPanel.Dock="Left"
+                    Command="{Binding OpenConnectionSettingsCommand}"
+                    Margin="10"
+                    Padding="15,8"/>
+            <Button Content="⚙ Setup"
+                    DockPanel.Dock="Right"
+                    Command="{Binding OpenSetupCommand}"
+                    IsVisible="{Binding ShowSetupButton}"
+                    Margin="10"
+                    Padding="15,8"/>
+        </DockPanel>
         <ContentControl Content="{Binding OperationViewModel}"
                         IsVisible="{Binding IsOperationViewReady}"
                         HorizontalAlignment="Stretch"

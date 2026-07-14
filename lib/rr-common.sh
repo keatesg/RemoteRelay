@@ -87,6 +87,31 @@ EOF
   chmod 644 "$RR_INSTALL_CONF"
 }
 
+# --- Rollback metadata ----------------------------------------------------------
+# Written by update.sh just before it replaces an installation, in a separate
+# file so the installer's rewrite of install.conf can't clobber it.
+RR_ROLLBACK_CONF="${RR_INSTALL_CONF_DIR}/rollback.conf"
+
+# rr_write_rollback_conf <version> <backup-dir>
+rr_write_rollback_conf() {
+  mkdir -p "$RR_INSTALL_CONF_DIR"
+  cat > "$RR_ROLLBACK_CONF" <<EOF
+# RemoteRelay rollback metadata — written by update.sh before an update.
+RR_ROLLBACK_VERSION="$1"
+RR_ROLLBACK_BACKUP="$2"
+EOF
+  chmod 644 "$RR_ROLLBACK_CONF"
+}
+
+# Sources rollback metadata into RR_ROLLBACK_VERSION / RR_ROLLBACK_BACKUP.
+# Returns non-zero when there is nothing to roll back to.
+rr_read_rollback_conf() {
+  [ -f "$RR_ROLLBACK_CONF" ] || return 1
+  # shellcheck disable=SC1090
+  . "$RR_ROLLBACK_CONF"
+  [ -n "${RR_ROLLBACK_VERSION:-}" ]
+}
+
 # --- Component / service state ------------------------------------------------
 rr_server_installed() { [ -x "$SERVER_INSTALL_DIR/RemoteRelay.Server" ]; }
 rr_client_installed() { [ -x "$CLIENT_INSTALL_DIR/RemoteRelay" ]; }

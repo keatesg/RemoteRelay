@@ -75,6 +75,14 @@ jobs:
           cp get.sh ./artifacts/get.sh
           cp get.sh ./artifacts/install
 
+      # A SHA256SUMS manifest lets get.sh/update.sh verify downloads instead of
+      # relying on a file-size sanity check.
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

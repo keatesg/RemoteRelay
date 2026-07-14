@@ -18,7 +18,9 @@ The bootstrap (`get.sh`):
    `aarch64` → `linux-arm64`, `armv7l`/`armv6l` → `linux-arm`,
    `x86_64` → `linux-x64`.
 4. Downloads the matching self-extracting installer from the latest GitHub
-   release and runs it.
+   release, verifies it against the release's `SHA256SUMS` manifest, and runs
+   it. (Releases published before checksums were introduced skip verification
+   with a warning.)
 
 > **x64 note:** on a PC/NUC the client runs normally, and the server works with
 > the **K8090 USB** relay driver (or Mock). The Raspberry Pi GPIO driver is
@@ -89,7 +91,7 @@ The menu provides:
   - **Screen blanking** — toggle kiosk (always-on) display behaviour.
   - **NTP servers** — set custom time servers.
 - **Update & maintenance** — install the latest stable or pre-release, reinstall
-  (repair), or uninstall.
+  (repair), roll back to the previously installed version, or uninstall.
 - **Logs** — view recent server logs, follow them live, or open the client log.
 
 > Routes, sources, output names, colours, port, inactive relay, TCP mirror and
@@ -107,6 +109,8 @@ sudo remoterelay restart
 sudo remoterelay update            # stable
 sudo remoterelay update --pre-release
 sudo remoterelay update --force    # reinstall current version (repair)
+sudo remoterelay update --version v1.2.3   # install a specific release
+sudo remoterelay rollback          # return to the previously installed version
 sudo remoterelay uninstall
 ```
 
@@ -119,7 +123,23 @@ sudo remoterelay update
 The updater checks GitHub, compares the installed version against the latest
 release for your configured channel, backs up your config (keeping the last 3
 backups under `~/.remoterelay-backups`), downloads the right installer for your
-architecture, and runs it. Your configuration is preserved.
+architecture, verifies its checksum against the release's `SHA256SUMS`
+manifest, and runs it. Your configuration is preserved.
+
+`sudo remoterelay update --version v1.2.3` installs a specific release instead
+of the channel's latest — downgrades included.
+
+## Rolling back
+
+```bash
+sudo remoterelay rollback
+```
+
+Every update first records which version it is replacing and keeps a backup of
+its configuration. `rollback` reinstalls that version and restores that config
+backup — useful when a new release misbehaves. Rolling back records the same
+metadata, so a rollback can itself be undone by running `rollback` again (or
+`update` to return to the latest).
 
 ## Uninstalling
 
@@ -142,5 +162,6 @@ install metadata (`/etc/remoterelay`).
 | `/usr/local/bin/remoterelay` | Management tool |
 | `/usr/local/lib/remoterelay` | Shared UI libraries |
 | `/etc/remoterelay/install.conf` | Install metadata (user, paths, repo, channel) |
+| `/etc/remoterelay/rollback.conf` | Version and config backup the last update replaced |
 | `/etc/systemd/system/remote-relay-server.service` | Server service unit |
 | `~/.remoterelay-backups` | Pre-update config backups |

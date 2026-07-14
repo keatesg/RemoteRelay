@@ -196,6 +196,23 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      # Stamp the assembly version from the release tag (v1.2.3 / v1.2.3-beta ->
+      # 1.2.3), mirroring the ubuntu job, so the binaries packed into the MSI
+      # report it via `--version`. Exported as the `Version` MSBuild property for
+      # every dotnet command in this job; also reused as the MSI ProductVersion.
+      - name: Set build version
+        shell: pwsh
+        run: |
+          $v = "${{ inputs.version }}"
+          if ($v) {
+            $v = $v -replace '^v', ''
+            $v = ($v -split '-')[0]
+          } else {
+            $v = '1.0.0'
+          }
+          "Version=$v" >> $env:GITHUB_ENV
+          Write-Host "Building version $v"
+
       - name: Publish Client (win-x64, self-contained)
         run: >
           dotnet publish RemoteRelay/RemoteRelay.csproj
@@ -228,21 +245,6 @@ jobs:
       - name: Restore Installer project
         run: dotnet restore RemoteRelay.Installer/RemoteRelay.Installer.wixproj
 
-      # Turn the release tag (e.g. v1.2.3 or v1.2.3-beta) into a numeric MSI
-      # ProductVersion (1.2.3). Empty on push/PR builds -> wixproj default.
-      - name: Compute MSI version
-        id: msiver
-        shell: pwsh
-        run: |
-          $v = "${{ inputs.version }}"
-          if ($v) {
-            $v = $v -replace '^v', ''
-            $v = ($v -split '-')[0]
-          } else {
-            $v = '1.0.0'
-          }
-          "version=$v" >> $env:GITHUB_OUTPUT
-
       - name: Build MSI
         run: >
           dotnet build RemoteRelay.Installer/RemoteRelay.Installer.wixproj
@@ -250,7 +252,7 @@ jobs:
           --no-restore
           -p:PublishClientDir=${{ github.workspace }}\publish\client
           -p:PublishServerDir=${{ github.workspace }}\publish\server
-          -p:BuildVersion=${{ steps.msiver.outputs.version }}
+          -p:BuildVersion=${{ env.Version }}
 
       - name: Upload MSI
         uses: actions/upload-artifact@v4

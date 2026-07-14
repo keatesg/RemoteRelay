@@ -35,6 +35,10 @@ public class ConfigurationService
             return (false, validationSummary);
         }
 
+        // Whatever schema version the caller (e.g. an older client) held, the
+        // file we write is in this build's schema.
+        settings.ConfigVersion = AppSettings.CurrentConfigVersion;
+
         try
         {
             var json = JsonSerializer.Serialize(settings, _serializerOptions);

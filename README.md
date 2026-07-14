@@ -59,11 +59,12 @@ After installing, manage everything from one place:
 sudo remoterelay
 ```
 
-This opens a menu to check status, start/stop the server, update, view logs,
-uninstall, and configure the options that aren't set from the client app
-(relay driver, K8090 serial port, default source, client connection, kiosk
-display, NTP). The same actions are available non-interactively, e.g.
-`sudo remoterelay status`, `sudo remoterelay restart`, `sudo remoterelay update`.
+This opens a menu to check status, start/stop the server, update, roll back a
+bad update, view logs, uninstall, and configure the options that aren't set
+from the client app (relay driver, K8090 serial port, default source, client
+connection, kiosk display, NTP). The same actions are available
+non-interactively, e.g. `sudo remoterelay status`, `sudo remoterelay restart`,
+`sudo remoterelay update`, `sudo remoterelay rollback`.
 
 See **[Linux Installer & Management](docs/Linux_Installer.md)** for details.
 

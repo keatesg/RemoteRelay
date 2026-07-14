@@ -5,12 +5,23 @@ The server is configured using the `config.json` file located in the same direct
 ## Configuration File Location
 
 - **Development**: `RemoteRelay.Server/config.json`
-- **Installed**: Same directory as the `RemoteRelay.Server` executable
+- **Installed (Linux)**: Same directory as the `RemoteRelay.Server` executable
+- **Installed (Windows)**: `%ProgramData%\RemoteRelay\Server\config.json`
+
+## Schema Versioning
+
+`config.json` carries a `ConfigVersion` number. At startup the server upgrades
+files written by older releases to the current schema automatically, keeping
+the original alongside as `config.json.pre-migration`. Files without the key
+(pre-versioning releases) are stamped on first load. You don't need to manage
+this value; it exists so future releases can change the config shape without
+breaking existing installs.
 
 ## Complete Configuration Example
 
 ```json
 {
+  "ConfigVersion": 1,
   "Routes": [
     {
       "SourceName": "Input 1",
