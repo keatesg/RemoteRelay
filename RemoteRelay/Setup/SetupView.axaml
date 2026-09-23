@@ -94,7 +94,7 @@
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="15">
                             <TextBlock Text="TCP Mirror:" Classes="label"/>
-                            <TextBox Text="{Binding TcpMirrorAddress}" Watermark="Address" Width="250"/>
+                            <TextBox Text="{Binding TcpMirrorAddress}" PlaceholderText="Address" Width="250"/>
                             <TextBlock Text="Port:" Classes="label"/>
                             <NumericUpDown Value="{Binding TcpMirrorPort}" Minimum="1" Maximum="65535" Width="130"/>
                         </StackPanel>
@@ -196,7 +196,7 @@
                                                         <!-- Row 2: TCP Message -->
                                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                                             <TextBlock Text="TCP Message:" Classes="label"/>
-                                                            <TextBox Text="{Binding TcpMessage}" Watermark="message to send on switch" Width="300"/>
+                                                            <TextBox Text="{Binding TcpMessage}" PlaceholderText="message to send on switch" Width="300"/>
                                                         </StackPanel>
                                                     </StackPanel>
                                                 </Border>
