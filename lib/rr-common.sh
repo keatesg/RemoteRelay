@@ -51,10 +51,18 @@ rr_resolve_user() {
 # known (rr_resolve_user or rr_read_install_conf).
 rr_set_paths() {
   BASE_INSTALL_DIR="${BASE_INSTALL_DIR:-$USER_HOME/RemoteRelay}"
-  SERVER_INSTALL_DIR="$BASE_INSTALL_DIR/server"
-  CLIENT_INSTALL_DIR="$BASE_INSTALL_DIR/client"
-  SERVER_CONFIG="$SERVER_INSTALL_DIR/config.json"
-  CLIENT_CONFIG="$CLIENT_INSTALL_DIR/ClientConfig.json"
+  SERVER_INSTALL_DIR="${SERVER_INSTALL_DIR:-$BASE_INSTALL_DIR/server}"
+  CLIENT_INSTALL_DIR="${CLIENT_INSTALL_DIR:-$BASE_INSTALL_DIR/client}"
+  if [ -f "/etc/remoterelay/config.json" ]; then
+    SERVER_CONFIG="/etc/remoterelay/config.json"
+  else
+    SERVER_CONFIG="$SERVER_INSTALL_DIR/config.json"
+  fi
+  if [ -f "$USER_HOME/.config/RemoteRelay/ClientConfig.json" ]; then
+    CLIENT_CONFIG="$USER_HOME/.config/RemoteRelay/ClientConfig.json"
+  else
+    CLIENT_CONFIG="$CLIENT_INSTALL_DIR/ClientConfig.json"
+  fi
   LIB_INSTALL_DIR="$BASE_INSTALL_DIR/lib"
 }
 
@@ -113,8 +121,24 @@ rr_read_rollback_conf() {
 }
 
 # --- Component / service state ------------------------------------------------
-rr_server_installed() { [ -x "$SERVER_INSTALL_DIR/RemoteRelay.Server" ]; }
-rr_client_installed() { [ -x "$CLIENT_INSTALL_DIR/RemoteRelay" ]; }
+rr_server_binary() {
+  if [ -x "/usr/bin/remoterelay-server" ]; then
+    printf '/usr/bin/remoterelay-server'
+  elif [ -x "$SERVER_INSTALL_DIR/RemoteRelay.Server" ]; then
+    printf '%s' "$SERVER_INSTALL_DIR/RemoteRelay.Server"
+  fi
+}
+
+rr_client_binary() {
+  if [ -x "/usr/bin/remoterelay-client" ]; then
+    printf '/usr/bin/remoterelay-client'
+  elif [ -x "$CLIENT_INSTALL_DIR/RemoteRelay" ]; then
+    printf '%s' "$CLIENT_INSTALL_DIR/RemoteRelay"
+  fi
+}
+
+rr_server_installed() { [ -n "$(rr_server_binary)" ]; }
+rr_client_installed() { [ -n "$(rr_client_binary)" ]; }
 
 rr_service_active()  { systemctl is-active  --quiet "$RR_SERVER_SERVICE_NAME"; }
 rr_service_enabled() { systemctl is-enabled --quiet "$RR_SERVER_SERVICE_NAME" 2>/dev/null; }

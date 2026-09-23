@@ -84,8 +84,8 @@ build_status() {
   fi
 
   local sver cver port driver k8090 sainsmart lcus modbus ips
-  sver="$(rr_binary_version "$SERVER_INSTALL_DIR/RemoteRelay.Server")"
-  cver="$(rr_binary_version "$CLIENT_INSTALL_DIR/RemoteRelay")"
+  sver="$(rr_binary_version "$(rr_server_binary)")"
+  cver="$(rr_binary_version "$(rr_client_binary)")"
   port="$(rr_json_get "$SERVER_CONFIG" '.ServerPort')"; port="${port:-not set}"
   driver="$(rr_json_get "$SERVER_CONFIG" '.RelayDriver')"; driver="${driver:-Auto}"
   k8090="$(rr_json_get "$SERVER_CONFIG" '.K8090.Port')"

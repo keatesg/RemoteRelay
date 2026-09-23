@@ -4,9 +4,19 @@ The server is configured using the `config.json` file located in the same direct
 
 ## Configuration File Location
 
-- **Development**: `RemoteRelay.Server/config.json`
-- **Installed (Linux)**: Same directory as the `RemoteRelay.Server` executable
+- **Installed (Linux)**: `/etc/remoterelay/config.json` (falls back to app directory in portable/development mode)
 - **Installed (Windows)**: `%ProgramData%\RemoteRelay\Server\config.json`
+- **Development**: `RemoteRelay.Server/config.json` or portable directory
+
+Configuration can be edited directly in `config.json` (changes are automatically hot-reloaded by the server daemon), or graphically using the **RemoteRelay Configurator** GUI (`remoterelay-config`) bundled with the server package.
+
+## Security & Config PIN
+
+Configuration updates submitted remotely via SignalR or the Configurator tool can be protected by a PIN:
+- `ConfigPin` (string, optional): A secret PIN or password.
+- When `ConfigPin` is not set (`null` or empty), configuration changes can be saved without authentication.
+- When `ConfigPin` is set, callers must supply the matching PIN to modify and save settings.
+- Direct editing of the configuration file on disk is always permitted and does not require a PIN.
 
 ## Schema Versioning
 

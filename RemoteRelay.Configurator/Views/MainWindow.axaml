@@ -1,0 +1,97 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:RemoteRelay.Configurator.ViewModels"
+        xmlns:views="clr-namespace:RemoteRelay.Configurator.Views"
+        x:Class="RemoteRelay.Configurator.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="RemoteRelay Server Configurator"
+        Width="1050" Height="750"
+        MinWidth="800" MinHeight="600"
+        WindowStartupLocation="CenterScreen">
+
+    <DockPanel Background="#181818">
+        <!-- Top App Bar / Connection Bar -->
+        <Border DockPanel.Dock="Top" Background="#007ACC" Padding="15" BorderBrush="#005A9E" BorderThickness="0,0,0,1">
+            <DockPanel>
+                <TextBlock Text="RemoteRelay Configurator"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           VerticalAlignment="Center"
+                           Margin="0,0,20,0"/>
+
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" DockPanel.Dock="Right">
+                    <TextBlock Text="Host:" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBox Text="{Binding Host}" IsEnabled="{Binding !IsConnected}" Width="150"/>
+
+                    <TextBlock Text="Port:" Foreground="White" VerticalAlignment="Center"/>
+                    <NumericUpDown Value="{Binding Port}" IsEnabled="{Binding !IsConnected}" Minimum="1" Maximum="65535" Width="100"/>
+
+                    <TextBlock Text="PIN:" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBox Text="{Binding Pin}" PasswordChar="*" PlaceholderText="Admin PIN" Width="100"/>
+
+                    <Button Content="Connect" Command="{Binding ConnectCommand}"
+                            IsVisible="{Binding !IsConnected}"
+                            Background="#0E639C" Foreground="White" FontWeight="Bold" Padding="12,6"/>
+
+                    <Button Content="Disconnect" Command="{Binding DisconnectCommand}"
+                            IsVisible="{Binding IsConnected}"
+                            Background="#C42B1C" Foreground="White" FontWeight="Bold" Padding="12,6"/>
+
+                    <Button Content="📁 Local File" Command="{Binding LoadLocalFileCommand}"
+                            Background="#3C3C3C" Foreground="White" Padding="10,6"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Bottom Status Bar -->
+        <Border DockPanel.Dock="Bottom" Background="#252526" Padding="10,6" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#CCCCCC" FontSize="12"/>
+        </Border>
+
+        <!-- Main Body -->
+        <Panel>
+            <!-- Connected View -->
+            <ContentControl Content="{Binding Configurator}" IsVisible="{Binding IsConnected}">
+                <ContentControl.ContentTemplate>
+                    <DataTemplate DataType="{x:Type vm:ConfiguratorViewModel}">
+                        <views:ConfiguratorView />
+                    </DataTemplate>
+                </ContentControl.ContentTemplate>
+            </ContentControl>
+
+            <!-- Disconnected / Welcome View -->
+            <ScrollViewer IsVisible="{Binding !IsConnected}" Padding="30" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel Spacing="15" MaxWidth="550" HorizontalAlignment="Center">
+                    <TextBlock Text="🔌 Connect to a RemoteRelay Server"
+                               FontSize="22" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Configure relay cards, routing matrices, GPIO pushbuttons, and color palettes from this console."
+                               Foreground="#AAAAAA" TextWrapping="Wrap" TextAlignment="Center"/>
+
+                    <!-- Discovered Servers -->
+                    <Border Background="#2D2D30" CornerRadius="8" Padding="15" Margin="0,10,0,0">
+                        <StackPanel Spacing="10">
+                            <DockPanel>
+                                <Button Content="🔍 Scan Network" Command="{Binding ScanCommand}" DockPanel.Dock="Right" Padding="8,4"/>
+                                <TextBlock Text="Discovered Servers on LAN" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                            </DockPanel>
+
+                            <ListBox ItemsSource="{Binding DiscoveredServers}"
+                                     SelectedItem="{Binding SelectedServer}"
+                                     Background="#1E1E1E" MinHeight="100">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:DiscoveredServerItem}">
+                                        <TextBlock Text="{Binding Display}" Padding="8" Foreground="#4EC9B0"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <TextBlock Text="Tap a server to select its address, then enter PIN (if set) and click Connect."
+                                       FontSize="12" Foreground="#888888"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Panel>
+    </DockPanel>
+</Window>

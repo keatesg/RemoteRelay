@@ -1,0 +1,266 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:RemoteRelay.Configurator.ViewModels"
+             x:Class="RemoteRelay.Configurator.Views.ConfiguratorView"
+             x:DataType="vm:ConfiguratorViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.section-header">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Margin" Value="0,15,0,8"/>
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="#2D2D30"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="15"/>
+            <Setter Property="Margin" Value="0,5"/>
+        </Style>
+        <Style Selector="Border.route-card">
+            <Setter Property="Background" Value="#252526"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Margin" Value="15,5,0,5"/>
+        </Style>
+        <Style Selector="Button.test-btn">
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="3,0"/>
+            <Setter Property="MinWidth" Value="50"/>
+        </Style>
+        <Style Selector="Button.delete-btn">
+            <Setter Property="Background" Value="#C42B1C"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="10,5"/>
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel Background="#1E1E1E">
+        <!-- Footer with Save & Status -->
+        <Border DockPanel.Dock="Bottom" Background="#252526" Padding="15" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
+            <DockPanel>
+                <Button Content="💾 Save Configuration"
+                        DockPanel.Dock="Right"
+                        Command="{Binding SaveCommand}"
+                        IsEnabled="{Binding !IsSaving}"
+                        Background="#0E639C"
+                        Foreground="White"
+                        Padding="20,10"
+                        FontWeight="Bold"/>
+                <TextBlock Text="{Binding StatusMessage}"
+                           VerticalAlignment="Center"
+                           Foreground="#4EC9B0"
+                           FontWeight="Medium"
+                           TextWrapping="Wrap"/>
+            </DockPanel>
+        </Border>
+
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Padding="20">
+            <StackPanel Spacing="10" MaxWidth="950">
+
+                <!-- Relay Driver Section -->
+                <TextBlock Text="═══ Relay Hardware &amp; Driver ═══" Classes="section-header"/>
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="15">
+                            <TextBlock Text="Relay Driver:" Classes="label"/>
+                            <ComboBox ItemsSource="{Binding AvailableRelayDrivers}"
+                                      SelectedItem="{Binding RelayDriver}"
+                                      Width="160"/>
+                        </StackPanel>
+
+                        <!-- K8090 settings -->
+                        <StackPanel Orientation="Horizontal" Spacing="15" IsVisible="{Binding RelayDriver, Converter={x:Static ObjectConverters.Equal}, ConverterParameter='K8090'}">
+                            <TextBlock Text="K8090 Serial Port:" Classes="label"/>
+                            <TextBox Text="{Binding K8090Port}" PlaceholderText="e.g. COM3 or /dev/ttyACM0" Width="250"/>
+                        </StackPanel>
+
+                        <!-- SainSmart settings -->
+                        <StackPanel Orientation="Horizontal" Spacing="15" IsVisible="{Binding RelayDriver, Converter={x:Static ObjectConverters.Equal}, ConverterParameter='SainSmart'}">
+                            <TextBlock Text="SainSmart Serial Port:" Classes="label"/>
+                            <TextBox Text="{Binding SainSmartPort}" PlaceholderText="e.g. COM3 or /dev/ttyUSB0" Width="220"/>
+                            <TextBlock Text="Channels:" Classes="label"/>
+                            <NumericUpDown Value="{Binding SainSmartChannels}" Minimum="1" Maximum="16" Width="90"/>
+                        </StackPanel>
+
+                        <!-- LCUS settings -->
+                        <StackPanel Orientation="Horizontal" Spacing="15" IsVisible="{Binding RelayDriver, Converter={x:Static ObjectConverters.Equal}, ConverterParameter='LCUS'}">
+                            <TextBlock Text="LCUS Serial Port:" Classes="label"/>
+                            <TextBox Text="{Binding LcusPort}" PlaceholderText="e.g. COM3 or /dev/ttyUSB0" Width="220"/>
+                            <TextBlock Text="Channels:" Classes="label"/>
+                            <NumericUpDown Value="{Binding LcusChannels}" Minimum="1" Maximum="16" Width="90"/>
+                        </StackPanel>
+
+                        <!-- Modbus settings -->
+                        <StackPanel Orientation="Horizontal" Spacing="15" IsVisible="{Binding RelayDriver, Converter={x:Static ObjectConverters.Equal}, ConverterParameter='ModbusRTU'}">
+                            <TextBlock Text="Modbus Serial Port:" Classes="label"/>
+                            <TextBox Text="{Binding ModbusPort}" PlaceholderText="e.g. COM3 or /dev/ttyUSB0" Width="200"/>
+                            <TextBlock Text="Channels:" Classes="label"/>
+                            <NumericUpDown Value="{Binding ModbusChannels}" Minimum="1" Maximum="32" Width="90"/>
+                            <TextBlock Text="Slave ID:" Classes="label"/>
+                            <NumericUpDown Value="{Binding ModbusSlaveId}" Minimum="1" Maximum="247" Width="80"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Security & Ports Section -->
+                <TextBlock Text="═══ Security &amp; Network ═══" Classes="section-header"/>
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="15">
+                            <TextBlock Text="Server Listen Port:" Classes="label"/>
+                            <NumericUpDown Value="{Binding ServerPort}" Minimum="1" Maximum="65535" Width="130"/>
+
+                            <TextBlock Text="Config PIN (Admin):" Classes="label" Margin="25,0,8,0"/>
+                            <TextBox Text="{Binding ConfigPin}" PlaceholderText="blank = unprotected" Width="160"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="15">
+                            <TextBlock Text="TCP Mirror Address:" Classes="label"/>
+                            <TextBox Text="{Binding TcpMirrorAddress}" PlaceholderText="IP or host" Width="200"/>
+                            <TextBlock Text="Port:" Classes="label"/>
+                            <NumericUpDown Value="{Binding TcpMirrorPort}" Minimum="1" Maximum="65535" Width="120"/>
+
+                            <TextBlock Text="UDP API Port:" Classes="label" Margin="20,0,8,0"/>
+                            <NumericUpDown Value="{Binding UdpApiPort}" Minimum="1" Maximum="65535" Width="120"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Inactive Relay Section -->
+                <TextBlock Text="═══ Inactive / Fail-Safe Relay ═══" Classes="section-header"/>
+                <Border Classes="card">
+                    <StackPanel Orientation="Horizontal" Spacing="15">
+                        <TextBlock Text="Relay Pin:" Classes="label"/>
+                        <NumericUpDown Value="{Binding InactiveRelayPin}" Minimum="0" Maximum="40" Width="90"/>
+                        <TextBlock Text="Inactive State:" Classes="label"/>
+                        <ComboBox SelectedItem="{Binding InactiveRelayState}" Width="100">
+                            <ComboBoxItem Content="High"/>
+                            <ComboBoxItem Content="Low"/>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
+                <!-- Inputs & Output Routes Section -->
+                <DockPanel>
+                    <Button Content="+ Add Input Source"
+                            DockPanel.Dock="Right"
+                            Command="{Binding AddInputCommand}"
+                            Background="#0E639C"
+                            Foreground="White"
+                            Padding="15,8"/>
+                    <TextBlock Text="═══ Routing Matrix (Inputs &amp; Outputs) ═══" Classes="section-header"/>
+                </DockPanel>
+
+                <!-- Input Cards -->
+                <ItemsControl ItemsSource="{Binding Inputs}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:InputConfigViewModel}">
+                            <Border Classes="card">
+                                <StackPanel Spacing="12">
+                                    <!-- Input Header -->
+                                    <DockPanel>
+                                        <Button Content="🗑 Delete Source"
+                                                DockPanel.Dock="Right"
+                                                Command="{Binding DeleteInputCommand}"
+                                                Classes="delete-btn"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <TextBlock Text="Source Name:" Classes="label"/>
+                                            <TextBox Text="{Binding SourceName}" Width="180"/>
+                                            <TextBlock Text="Color:" Classes="label"/>
+                                            <ColorPicker Color="{Binding CustomColorValue}" />
+                                            <Button Content="Reset Color" Command="{Binding ClearColorCommand}" Classes="test-btn"/>
+                                        </StackPanel>
+                                    </DockPanel>
+
+                                    <!-- Physical Button Config -->
+                                    <StackPanel Orientation="Horizontal" Spacing="15">
+                                        <TextBlock Text="GPIO Pushbutton Pin:" Classes="label"/>
+                                        <NumericUpDown Value="{Binding PhysicalButtonPin}" Minimum="0" Maximum="40" Width="80"/>
+                                        <TextBlock Text="Trigger:" Classes="label"/>
+                                        <ComboBox SelectedItem="{Binding PhysicalButtonTrigger}" Width="90">
+                                            <ComboBoxItem Content="Low"/>
+                                            <ComboBoxItem Content="High"/>
+                                        </ComboBox>
+                                    </StackPanel>
+
+                                    <!-- Add Output Button -->
+                                    <Button Content="+ Add Output Destination"
+                                            Command="{Binding AddOutputRouteCommand}"
+                                            Background="#3C3C3C"
+                                            Foreground="White"
+                                            Padding="10,5"
+                                            HorizontalAlignment="Left"/>
+
+                                    <!-- Output Routes -->
+                                    <ItemsControl ItemsSource="{Binding OutputRoutes}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type vm:RouteConfigViewModel}">
+                                                <Border Classes="route-card">
+                                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                                        <TextBlock Text="Output:" Classes="label"/>
+                                                        <TextBox Text="{Binding OutputName}" Width="150"/>
+
+                                                        <TextBlock Text="Relay Pin/Channel:" Classes="label"/>
+                                                        <NumericUpDown Value="{Binding RelayPin}" Minimum="0" Maximum="64" Width="80"/>
+
+                                                        <CheckBox IsChecked="{Binding ActiveLow}" Content="Active Low" VerticalAlignment="Center" Margin="5,0"/>
+
+                                                        <Button Content="⚡ Test Switch" Command="{Binding TestRouteCommand}" Classes="test-btn" Background="#007ACC" Foreground="White"/>
+                                                        <Button Content="🗑" Command="{Binding DeleteRouteCommand}" Classes="delete-btn"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Default Routes Section -->
+                <TextBlock Text="═══ Default Routes ═══" Classes="section-header"/>
+                <Border Classes="card">
+                    <ItemsControl ItemsSource="{Binding DefaultRoutes}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:DefaultRouteViewModel}">
+                                <StackPanel Orientation="Horizontal" Spacing="15" Margin="0,5">
+                                    <TextBlock Text="{Binding SourceName}" Classes="label" Width="150"/>
+                                    <TextBlock Text="defaults to" Classes="label"/>
+                                    <ComboBox ItemsSource="{Binding AvailableOutputs}"
+                                              SelectedItem="{Binding SelectedOutput}"
+                                              Width="200"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+
+                <!-- General Options Section -->
+                <TextBlock Text="═══ UI &amp; Display Options ═══" Classes="section-header"/>
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="25">
+                            <CheckBox IsChecked="{Binding FlashOnSelect}" Content="Flash On Select"/>
+                            <CheckBox IsChecked="{Binding ShowIpOnScreen}" Content="Show IP On Screen"/>
+                            <CheckBox IsChecked="{Binding ShowClockOnScreen}" Content="Show Clock On Screen"/>
+                            <CheckBox IsChecked="{Binding Logging}" Content="Logging"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="15">
+                            <TextBlock Text="Theme Palette:" Classes="label"/>
+                            <ComboBox ItemsSource="{Binding AvailablePalettes}" SelectedItem="{Binding ThemePalette}" Width="150"/>
+                            <TextBlock Text="Logo File Path:" Classes="label" Margin="20,0,8,0"/>
+                            <TextBox Text="{Binding LogoFile}" Width="350" PlaceholderText="/path/to/logo.png"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

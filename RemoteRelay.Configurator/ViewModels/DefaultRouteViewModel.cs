@@ -1,10 +1,7 @@
-using System;
 using System.Collections.ObjectModel;
-using System.Linq;
 using ReactiveUI;
-using RemoteRelay.Common;
 
-namespace RemoteRelay.Setup;
+namespace RemoteRelay.Configurator.ViewModels;
 
 public class DefaultRouteViewModel : ViewModelBase
 {

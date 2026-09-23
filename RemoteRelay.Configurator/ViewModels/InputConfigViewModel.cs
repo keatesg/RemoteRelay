@@ -1,18 +1,17 @@
 using System;
 using System.Collections.ObjectModel;
-using ReactiveUI;
 using System.Windows.Input;
 using Avalonia.Media;
+using ReactiveUI;
+using RemoteRelay.Configurator.Services;
 
-namespace RemoteRelay.Setup;
+namespace RemoteRelay.Configurator.ViewModels;
 
-/// <summary>
-/// View model for a single input card in the setup UI.
-/// </summary>
 public class InputConfigViewModel : ViewModelBase
 {
     private readonly Action<InputConfigViewModel> _deleteAction;
     private readonly Action<string>? _statusReporter;
+    private readonly ConfiguratorClient? _client;
 
     private string _sourceName = string.Empty;
     public string SourceName
@@ -30,7 +29,7 @@ public class InputConfigViewModel : ViewModelBase
         set
         {
             this.RaiseAndSetIfChanged(ref _customColorValue, value);
-            _customColor = value.ToString(); // Generates #AARRGGBB
+            _customColor = value.ToString();
             this.RaisePropertyChanged(nameof(CustomColor));
         }
     }
@@ -72,52 +71,50 @@ public class InputConfigViewModel : ViewModelBase
 
     public ICommand AddOutputRouteCommand { get; }
     public ICommand DeleteInputCommand { get; }
-    public ICommand TestPhysicalButtonCommand { get; }
     public ICommand ClearColorCommand { get; }
 
-    public InputConfigViewModel(string sourceName, string customColor, Color autoPaletteColour, Action<InputConfigViewModel> deleteAction, Action<string>? statusReporter = null)
+    public InputConfigViewModel(
+        string sourceName,
+        string customColor,
+        Color autoPaletteColour,
+        Action<InputConfigViewModel> deleteAction,
+        Action<string>? statusReporter = null,
+        ConfiguratorClient? client = null)
     {
         _sourceName = sourceName;
         _autoPaletteColour = autoPaletteColour;
         _deleteAction = deleteAction;
         _statusReporter = statusReporter;
+        _client = client;
 
-        // Drive both _customColor and _customColorValue via the property setter so the ColorPicker reflects the saved value.
         CustomColor = customColor;
 
         AddOutputRouteCommand = ReactiveCommand.Create(AddOutputRoute);
         DeleteInputCommand = ReactiveCommand.Create(() => _deleteAction(this));
-        TestPhysicalButtonCommand = ReactiveCommand.CreateFromTask(async () =>
+        ClearColorCommand = ReactiveCommand.Create(() =>
         {
-            if (string.IsNullOrWhiteSpace(SourceName))
-            {
-                _statusReporter?.Invoke("Enter a source name before testing the physical switch.");
-                return;
-            }
-
-            if (PhysicalButtonPin <= 0)
-            {
-                _statusReporter?.Invoke($"Configure a physical button pin for {SourceName} before testing.");
-                return;
-            }
-
-            _statusReporter?.Invoke($"Testing saved switch path for {SourceName}...");
-            var error = await SwitcherClient.Instance.TestPhysicalButtonAsync(SourceName);
-            _statusReporter?.Invoke(error == null
-                ? $"Simulated physical button press for {SourceName}."
-                : $"Physical switch test failed for {SourceName}: {error}");
+            _customColor = string.Empty;
+            _customColorValue = _autoPaletteColour;
+            this.RaisePropertyChanged(nameof(CustomColor));
+            this.RaisePropertyChanged(nameof(CustomColorValue));
         });
-
-        ClearColorCommand = ReactiveCommand.Create(() => CustomColor = string.Empty);
     }
 
     private void AddOutputRoute()
     {
-        var newName = $"Output {OutputRoutes.Count + 1}";
-        OutputRoutes.Add(new RouteConfigViewModel(newName, 0, true, string.Empty, () => RemoveRoute));
+        var outputName = $"Output {OutputRoutes.Count + 1}";
+        var newRoute = new RouteConfigViewModel(
+            outputName,
+            0,
+            activeLow: true,
+            string.Empty,
+            () => DeleteRoute,
+            () => SourceName,
+            _client);
+        OutputRoutes.Add(newRoute);
     }
 
-    public void RemoveRoute(RouteConfigViewModel route)
+    private void DeleteRoute(RouteConfigViewModel route)
     {
         OutputRoutes.Remove(route);
     }

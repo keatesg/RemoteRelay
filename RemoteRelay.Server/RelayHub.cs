@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using RemoteRelay.Common;
 using RemoteRelay.Server.Services;
 
@@ -74,11 +74,42 @@ public class RelayHub : Hub
     }
 
     /// <summary>
+    /// Checks whether the server configuration is protected by a PIN.
+    /// </summary>
+    public bool IsPinRequired()
+    {
+        var current = _switcherState.GetSettings();
+        return !string.IsNullOrWhiteSpace(current.ConfigPin);
+    }
+
+    /// <summary>
+    /// Overload for clients that do not pass a PIN.
+    /// </summary>
+    public Task<SaveConfigurationResponse> SaveConfiguration(AppSettings settings)
+    {
+        return SaveConfiguration(settings, null);
+    }
+
+    /// <summary>
     /// Saves the provided configuration to the server's config.json file.
+    /// If the server has a ConfigPin configured, providedPin must match it.
     /// </summary>
     /// <returns>A response indicating success or failure with error message.</returns>
-    public async Task<SaveConfigurationResponse> SaveConfiguration(AppSettings settings)
+    public async Task<SaveConfigurationResponse> SaveConfiguration(AppSettings settings, string? providedPin)
     {
+        var current = _switcherState.GetSettings();
+        if (!string.IsNullOrWhiteSpace(current.ConfigPin))
+        {
+            if (string.IsNullOrWhiteSpace(providedPin) || !string.Equals(current.ConfigPin, providedPin))
+            {
+                return new SaveConfigurationResponse
+                {
+                    Success = false,
+                    Error = "Invalid or missing configuration PIN."
+                };
+            }
+        }
+
         var (success, error) = await _configurationService.SaveAsync(settings);
         if (success)
         {
@@ -86,7 +117,10 @@ public class RelayHub : Hub
             // Without this the ConfigurationWatcher will eventually catch up, but the caller's immediate
             // RequestSettings() can race against the file watcher and pull back the previous settings.
             await _switcherState.ApplySettingsAsync(settings);
-            await Clients.All.SendAsync("Configuration", _switcherState.GetSettings());
+            if (Clients != null)
+            {
+                await Clients.All.SendAsync("Configuration", _switcherState.GetSettings());
+            }
         }
 
         return new SaveConfigurationResponse

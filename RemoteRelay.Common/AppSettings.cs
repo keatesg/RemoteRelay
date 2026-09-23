@@ -127,6 +127,7 @@ public struct AppSettings
     public LcusSettings? LCUS { get; set; }
     public ModbusSettings? ModbusRTU { get; set; }
     public string ThemePalette { get; set; }
+    public string? ConfigPin { get; set; } // Optional configuration PIN; if null/empty, saving is unprotected
 
     // Parameterless constructor for struct initialization
     public AppSettings()

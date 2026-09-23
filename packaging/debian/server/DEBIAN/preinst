@@ -1,0 +1,65 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    install|upgrade)
+        # 1. Stop any currently active server daemon or process
+        if [ -d /run/systemd/system ]; then
+            systemctl stop remote-relay-server.service >/dev/null 2>&1 || true
+        fi
+        pkill -f "RemoteRelay.Server" >/dev/null 2>&1 || true
+
+        # 2. Check for legacy /etc/systemd/system/remote-relay-server.service conflict.
+        # Older makeself installers wrote directly to /etc/systemd/system/, which overrides
+        # vendor package unit files in /lib/systemd/system/.
+        if [ -f /etc/systemd/system/remote-relay-server.service ]; then
+            if grep -q "RemoteRelay/server" /etc/systemd/system/remote-relay-server.service 2>/dev/null || \
+               ! grep -q "/usr/bin/remoterelay-server" /etc/systemd/system/remote-relay-server.service 2>/dev/null; then
+                echo "Found legacy service unit at /etc/systemd/system/remote-relay-server.service. Backing up..."
+                mv /etc/systemd/system/remote-relay-server.service /etc/systemd/system/remote-relay-server.service.legacy-backup
+                if [ -d /run/systemd/system ]; then
+                    systemctl --system daemon-reload >/dev/null 2>&1 || true
+                fi
+            fi
+        fi
+
+        # 3. Detect and stage legacy server configuration for migration.
+        # If /etc/remoterelay/config.json does not exist, look for configs from older versions.
+        if [ ! -f /etc/remoterelay/config.json ] && [ ! -f /etc/remoterelay/config.json.legacy-migrated ]; then
+            LEGACY_CONF=""
+
+            # Check install.conf if available
+            if [ -f /etc/remoterelay/install.conf ]; then
+                # shellcheck disable=SC1091
+                . /etc/remoterelay/install.conf
+                if [ -n "${RR_CONF_BASE_DIR:-}" ] && [ -f "${RR_CONF_BASE_DIR}/server/config.json" ]; then
+                    LEGACY_CONF="${RR_CONF_BASE_DIR}/server/config.json"
+                fi
+            fi
+
+            # Check user home directories
+            if [ -z "$LEGACY_CONF" ]; then
+                for udir in /home/* /root; do
+                    [ -d "$udir" ] || continue
+                    if [ -f "$udir/RemoteRelay/server/config.json" ]; then
+                        LEGACY_CONF="$udir/RemoteRelay/server/config.json"
+                        break
+                    elif [ -f "$udir/.local/share/RemoteRelay/Server/config.json" ]; then
+                        LEGACY_CONF="$udir/.local/share/RemoteRelay/Server/config.json"
+                        break
+                    fi
+                done
+            fi
+
+            # If legacy config was found, stage it for postinst
+            if [ -n "$LEGACY_CONF" ] && [ -f "$LEGACY_CONF" ]; then
+                echo "Discovered legacy server configuration at: $LEGACY_CONF"
+                mkdir -p /etc/remoterelay
+                cp -a "$LEGACY_CONF" /etc/remoterelay/config.json.legacy-migrated
+                chmod 644 /etc/remoterelay/config.json.legacy-migrated
+            fi
+        fi
+        ;;
+esac
+
+exit 0

@@ -262,9 +262,25 @@ public class SwitcherClient
     }
 
     /// <summary>
-    /// Saves the provided configuration to the server.
+    /// Checks whether the connected server requires a PIN to save configuration.
     /// </summary>
-    public async Task<SaveConfigurationResponse?> SaveConfigurationAsync(AppSettings settings)
+    public async Task<bool> IsPinRequiredAsync()
+    {
+        if (!IsConnected) return false;
+        try
+        {
+            return await _connection.InvokeAsync<bool>("IsPinRequired");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Saves the provided configuration to the server, with optional PIN.
+    /// </summary>
+    public async Task<SaveConfigurationResponse?> SaveConfigurationAsync(AppSettings settings, string? pin = null)
     {
         if (!IsConnected)
         {
@@ -274,7 +290,7 @@ public class SwitcherClient
 
         try
         {
-            return await _connection.InvokeAsync<SaveConfigurationResponse>("SaveConfiguration", settings);
+            return await _connection.InvokeAsync<SaveConfigurationResponse>("SaveConfiguration", settings, pin);
         }
         catch (Exception ex)
         {

@@ -4,7 +4,6 @@
         xmlns:singleOutput="clr-namespace:RemoteRelay.SingleOutput"
         xmlns:multiOutput="clr-namespace:RemoteRelay.MultiOutput"
         xmlns:controls="clr-namespace:RemoteRelay.Controls"
-        xmlns:setup="clr-namespace:RemoteRelay.Setup"
         xmlns:connection="clr-namespace:RemoteRelay.Connection"
         x:Class="RemoteRelay.MainWindow"
         Title="SourceSwitcher"
@@ -20,9 +19,6 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type controls:SourceButtonViewModel}">
             <controls:SourceButton />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type setup:SetupViewModel}">
-            <setup:SetupView />
         </DataTemplate>
         <DataTemplate DataType="{x:Type connection:ConnectionSettingsViewModel}">
             <connection:ConnectionSettingsView />
@@ -47,15 +43,9 @@
             <TextBlock Text="{Binding ServerStatusMessage}" />
         </Viewbox>
         <DockPanel DockPanel.Dock="Bottom" LastChildFill="False">
-            <Button Content="🔗 Connection"
+            <Button Content="⚙ Client Settings"
                     DockPanel.Dock="Left"
                     Command="{Binding OpenConnectionSettingsCommand}"
-                    Margin="10"
-                    Padding="15,8"/>
-            <Button Content="⚙ Setup"
-                    DockPanel.Dock="Right"
-                    Command="{Binding OpenSetupCommand}"
-                    IsVisible="{Binding ShowSetupButton}"
                     Margin="10"
                     Padding="15,8"/>
         </DockPanel>

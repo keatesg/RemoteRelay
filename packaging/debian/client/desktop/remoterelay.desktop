@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=RemoteRelay Client
+Comment=Remote Relay Touch Switching Client
+Exec=/usr/bin/remoterelay-client
+Icon=applications-multimedia
+Terminal=false
+Categories=AudioVideo;Audio;Utility;

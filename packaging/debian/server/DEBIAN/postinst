@@ -1,0 +1,37 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+        # Ensure /etc/remoterelay exists and has proper permissions
+        mkdir -p /etc/remoterelay
+        chmod 755 /etc/remoterelay
+
+        # If a legacy configuration was staged during preinst, apply it
+        if [ -f /etc/remoterelay/config.json.legacy-migrated ]; then
+            echo "Applying migrated legacy configuration to /etc/remoterelay/config.json..."
+            if [ -f /etc/remoterelay/config.json ]; then
+                cp -a /etc/remoterelay/config.json /etc/remoterelay/config.json.package-default
+            fi
+            mv /etc/remoterelay/config.json.legacy-migrated /etc/remoterelay/config.json
+        fi
+
+        if [ -f /etc/remoterelay/config.json ]; then
+            chmod 644 /etc/remoterelay/config.json
+        fi
+
+        # Reload systemd and enable/restart service if systemd is active
+        if [ -d /run/systemd/system ]; then
+            systemctl --system daemon-reload >/dev/null 2>&1 || true
+            systemctl enable remote-relay-server.service >/dev/null 2>&1 || true
+            systemctl restart remote-relay-server.service >/dev/null 2>&1 || true
+        fi
+
+        # Update desktop database
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database -q /usr/share/applications || true
+        fi
+        ;;
+esac
+
+exit 0

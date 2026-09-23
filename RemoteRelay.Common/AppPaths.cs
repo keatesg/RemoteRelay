@@ -6,14 +6,12 @@ namespace RemoteRelay.Common;
 /// <summary>
 /// Resolves where mutable application data (config files and logs) lives.
 ///
-/// On Windows this is <c>%ProgramData%\RemoteRelay\{Server|Client}</c> so the data is
-/// machine-wide, writable by the LocalSystem service and by an admin (or any user, once
-/// the installer grants Modify on the folder), and survives reinstalls into Program Files.
+/// On Windows:
+///   <c>%ProgramData%\RemoteRelay\{Server|Client}</c>
 ///
-/// On every other platform (the Raspberry Pi / Linux installs) the historical
-/// install-directory location is kept unchanged: the systemd unit's WorkingDirectory, the
-/// <c>remoterelay.sh</c> management TUI, and <c>install.sh</c>'s upgrade-time config
-/// preservation all assume config lives next to the binary. Only Windows moves.
+/// On Linux:
+///   Server: <c>/etc/remoterelay</c> (falls back to AppContext.BaseDirectory in development/portable mode)
+///   Client: <c>~/.config/RemoteRelay</c> (falls back to AppContext.BaseDirectory in development/portable mode)
 /// </summary>
 public static class AppPaths
 {
@@ -26,7 +24,7 @@ public static class AppPaths
     public static string ServerConfigPath => Path.Combine(ServerDataDir, "config.json");
     public static string ClientConfigPath => Path.Combine(ClientDataDir, "ClientConfig.json");
 
-    public static string ServerLogPath => Path.Combine(ServerDataDir, "server_error.log");
+    public static string ServerLogPath => ResolveServerLogPath();
     public static string ClientLogPath => Path.Combine(ClientDataDir, "client_error.log");
 
     /// <summary>Resolves the data directory for a component, creating it if necessary.</summary>
@@ -40,7 +38,76 @@ public static class AppPaths
         }
         else
         {
-            dir = AppContext.BaseDirectory;
+            if (component == ServerComponent)
+            {
+                // In production on Linux, server configuration lives in /etc/remoterelay.
+                // If /etc/remoterelay exists or /etc/remoterelay/config.json exists, use it.
+                // Otherwise fall back to AppContext.BaseDirectory (for development or portable mode).
+                const string etcDir = "/etc/remoterelay";
+                if (Directory.Exists(etcDir) || File.Exists(Path.Combine(etcDir, "config.json")))
+                {
+                    dir = etcDir;
+                }
+                else if (File.Exists(Path.Combine(AppContext.BaseDirectory, "config.json")))
+                {
+                    dir = AppContext.BaseDirectory;
+                }
+                else
+                {
+                    // Attempt to create /etc/remoterelay if running with root privileges, else fallback to BaseDirectory
+                    try
+                    {
+                        Directory.CreateDirectory(etcDir);
+                        dir = etcDir;
+                    }
+                    catch
+                    {
+                        dir = AppContext.BaseDirectory;
+                    }
+                }
+            }
+            else
+            {
+                // Client on Linux: ~/.config/RemoteRelay (XDG_CONFIG_HOME)
+                var userConfig = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RemoteRelay");
+                var userConfigFile = Path.Combine(userConfig, "ClientConfig.json");
+
+                if (File.Exists(Path.Combine(AppContext.BaseDirectory, "ClientConfig.json")) && !File.Exists(userConfigFile))
+                {
+                    dir = AppContext.BaseDirectory;
+                }
+                else
+                {
+                    dir = userConfig;
+
+                    // Automatic migration from legacy location (~/RemoteRelay/client/ClientConfig.json or ServerDetails.json)
+                    try
+                    {
+                        if (!File.Exists(userConfigFile))
+                        {
+                            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                            var legacyClientDir = Path.Combine(userProfile, "RemoteRelay", "client");
+                            var legacyConfig = Path.Combine(legacyClientDir, "ClientConfig.json");
+                            var legacyServerDetails = Path.Combine(legacyClientDir, "ServerDetails.json");
+
+                            if (File.Exists(legacyConfig))
+                            {
+                                Directory.CreateDirectory(userConfig);
+                                File.Copy(legacyConfig, userConfigFile, overwrite: false);
+                            }
+                            else if (File.Exists(legacyServerDetails))
+                            {
+                                Directory.CreateDirectory(userConfig);
+                                File.Copy(legacyServerDetails, userConfigFile, overwrite: false);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Best-effort migration; ignore if unavailable
+                    }
+                }
+            }
         }
 
         try
@@ -54,5 +121,28 @@ public static class AppPaths
         }
 
         return dir;
+    }
+
+    private static string ResolveServerLogPath()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return Path.Combine(ServerDataDir, "server_error.log");
+        }
+
+        // On Linux, prefer /var/log/remoterelay if the directory exists
+        const string logDir = "/var/log/remoterelay";
+        try
+        {
+            if (Directory.Exists(logDir))
+            {
+                return Path.Combine(logDir, "server_error.log");
+            }
+        }
+        catch
+        {
+        }
+
+        return Path.Combine(ServerDataDir, "server_error.log");
     }
 }

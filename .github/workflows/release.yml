@@ -46,8 +46,8 @@ jobs:
           # Zip each artifact folder
           for dir in */; do
             name="${dir%/}"
-            # Skip if already a zip/sh/msi file
-            if [[ "$name" == *.zip ]] || [[ "$name" == *.sh ]] || [[ "$name" == *.msi ]]; then
+            # Skip if already a zip/sh/msi/deb file
+            if [[ "$name" == *.zip ]] || [[ "$name" == *.sh ]] || [[ "$name" == *.msi ]] || [[ "$name" == *.deb ]]; then
               continue
             fi
             cd "$name"
@@ -57,6 +57,9 @@ jobs:
               if [[ -n "$msi" ]]; then
                 mv "$msi" "../${name}.msi"
               fi
+            elif [[ "$name" == *Debian* ]]; then
+              # Debian packages — move all .deb files up
+              mv *.deb ".." 2>/dev/null || true
             elif [[ "$name" == *Installer* ]]; then
               # Linux makeself installer — move the .sh up
               mv *.sh "../${name}.sh" 2>/dev/null || true

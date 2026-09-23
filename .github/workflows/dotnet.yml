@@ -48,13 +48,21 @@ jobs:
       run: |
         dotnet restore RemoteRelay.Common/RemoteRelay.Common.csproj
         dotnet restore RemoteRelay/RemoteRelay.csproj
+        dotnet restore RemoteRelay.Configurator/RemoteRelay.Configurator.csproj
         dotnet restore RemoteRelay.Server/RemoteRelay.Server.csproj
+        dotnet restore RemoteRelay.Tests/RemoteRelay.Tests.csproj
 
     - name: Build
       run: |
         dotnet build RemoteRelay.Common/RemoteRelay.Common.csproj --no-restore --configuration Release
         dotnet build RemoteRelay/RemoteRelay.csproj --no-restore --configuration Release
+        dotnet build RemoteRelay.Configurator/RemoteRelay.Configurator.csproj --no-restore --configuration Release
         dotnet build RemoteRelay.Server/RemoteRelay.Server.csproj --no-restore --configuration Release
+        dotnet build RemoteRelay.Tests/RemoteRelay.Tests.csproj --no-restore --configuration Release
+
+    - name: Run Tests
+      run: |
+        dotnet test RemoteRelay.Tests/RemoteRelay.Tests.csproj --no-build --configuration Release
 
     # ======== Server Build (linux-arm64 only) ========
     - name: Publish Server - linux-arm64
@@ -182,6 +190,27 @@ jobs:
       with:
         name: RemoteRelay-Installer-linux-x64
         path: ./remote-relay-installer-linux-x64.sh
+
+    # ======== Debian Packages (.deb) ========
+    - name: Create Debian packages
+      run: |
+        chmod +x packaging/debian/build_deb.sh
+        mkdir -p ./dist
+
+        # Generate Debian packages for linux-arm64 (Raspberry Pi 64-bit)
+        ./packaging/debian/build_deb.sh linux-arm64 "${Version}" ./dist
+
+        # Generate Debian packages for linux-arm (Raspberry Pi 32-bit)
+        ./packaging/debian/build_deb.sh linux-arm "${Version}" ./dist
+
+        # Generate Debian packages for linux-x64 (PC / AMD64)
+        ./packaging/debian/build_deb.sh linux-x64 "${Version}" ./dist
+
+    - name: Upload Debian Packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: RemoteRelay-Debian-Packages
+        path: ./dist/*.deb
 
   # ======== Windows MSI Installer ========
   windows-installer:

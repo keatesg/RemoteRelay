@@ -23,14 +23,29 @@ public class DiscoveredServer
     public string Display => $"{Name} ({Host}:{Port})";
 }
 
+public class FilterItem : ViewModelBase
+{
+    public string Name { get; }
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => this.RaiseAndSetIfChanged(ref _isSelected, value);
+    }
+
+    public FilterItem(string name, bool isSelected)
+    {
+        Name = name;
+        _isSelected = isSelected;
+    }
+}
+
 /// <summary>
-/// Edits the client's server connection (host/port) with mDNS discovery.
-/// Save reports the chosen host/port back to the owner; a null host means
-/// "auto-discover on this network".
+/// Edits the client's server connection (host/port) and per-client input/output filtering.
 /// </summary>
 public class ConnectionSettingsViewModel : ViewModelBase
 {
-    private readonly Action<string?, int?> _onSave;
+    private readonly Action<string?, int?, System.Collections.Generic.List<string>?, System.Collections.Generic.List<string>?> _onSave;
 
     private string _host;
     public string Host
@@ -61,6 +76,10 @@ public class ConnectionSettingsViewModel : ViewModelBase
     }
 
     public ObservableCollection<DiscoveredServer> DiscoveredServers { get; } = new();
+    public ObservableCollection<FilterItem> AvailableInputs { get; } = new();
+    public ObservableCollection<FilterItem> AvailableOutputs { get; } = new();
+
+    public bool HasFilteringOptions => AvailableInputs.Count > 0 || AvailableOutputs.Count > 0;
 
     private DiscoveredServer? _selectedServer;
     public DiscoveredServer? SelectedServer
@@ -80,16 +99,48 @@ public class ConnectionSettingsViewModel : ViewModelBase
     public ICommand ScanCommand { get; }
     public ICommand SaveCommand { get; }
     public ICommand CancelCommand { get; }
+    public ICommand SelectAllInputsCommand { get; }
+    public ICommand SelectAllOutputsCommand { get; }
 
-    public ConnectionSettingsViewModel(string? host, int? port, Action<string?, int?> onSave, Action onCancel)
+    public ConnectionSettingsViewModel(
+        string? host,
+        int? port,
+        System.Collections.Generic.IEnumerable<string>? availableInputs,
+        System.Collections.Generic.IEnumerable<string>? selectedInputs,
+        System.Collections.Generic.IEnumerable<string>? availableOutputs,
+        System.Collections.Generic.IEnumerable<string>? selectedOutputs,
+        Action<string?, int?, System.Collections.Generic.List<string>?, System.Collections.Generic.List<string>?> onSave,
+        Action onCancel)
     {
         _onSave = onSave;
         _host = host ?? string.Empty;
         _port = port;
 
+        var selectedInputSet = new System.Collections.Generic.HashSet<string>(selectedInputs ?? System.Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+        if (availableInputs != null)
+        {
+            foreach (var input in availableInputs)
+            {
+                var isSelected = selectedInputs == null || selectedInputSet.Contains(input);
+                AvailableInputs.Add(new FilterItem(input, isSelected));
+            }
+        }
+
+        var selectedOutputSet = new System.Collections.Generic.HashSet<string>(selectedOutputs ?? System.Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+        if (availableOutputs != null)
+        {
+            foreach (var output in availableOutputs)
+            {
+                var isSelected = selectedOutputs == null || selectedOutputSet.Contains(output);
+                AvailableOutputs.Add(new FilterItem(output, isSelected));
+            }
+        }
+
         ScanCommand = ReactiveCommand.CreateFromTask(ScanAsync);
         SaveCommand = ReactiveCommand.Create(Save);
         CancelCommand = ReactiveCommand.Create(onCancel);
+        SelectAllInputsCommand = ReactiveCommand.Create(() => { foreach (var item in AvailableInputs) item.IsSelected = true; });
+        SelectAllOutputsCommand = ReactiveCommand.Create(() => { foreach (var item in AvailableOutputs) item.IsSelected = true; });
 
         _ = ScanAsync();
     }
@@ -140,6 +191,8 @@ public class ConnectionSettingsViewModel : ViewModelBase
     private void Save()
     {
         var host = string.IsNullOrWhiteSpace(Host) ? null : Host.Trim();
-        _onSave(host, Port is null ? null : (int)Port);
+        var inputs = AvailableInputs.Count > 0 ? AvailableInputs.Where(x => x.IsSelected).Select(x => x.Name).ToList() : null;
+        var outputs = AvailableOutputs.Count > 0 ? AvailableOutputs.Where(x => x.IsSelected).Select(x => x.Name).ToList() : null;
+        _onSave(host, Port is null ? null : (int)Port, inputs, outputs);
     }
 }

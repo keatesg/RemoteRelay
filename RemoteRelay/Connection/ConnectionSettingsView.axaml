@@ -76,6 +76,59 @@
                     </ListBox>
                 </Border>
 
+                <!-- Display Filtering Section -->
+                <StackPanel Spacing="8" Margin="0,15,0,0" IsVisible="{Binding HasFilteringOptions}">
+                    <TextBlock Text="═══ Display Filtering (This Screen) ═══" FontWeight="Bold" FontSize="16"/>
+                    <TextBlock Text="Choose which sources and outputs are visible on this specific client screen."
+                               Foreground="#AAAAAA" FontSize="12"/>
+
+                    <!-- Inputs -->
+                    <Border Background="#2D2D30" CornerRadius="8" Padding="12">
+                        <StackPanel Spacing="8">
+                            <DockPanel>
+                                <Button Content="Select All" DockPanel.Dock="Right"
+                                        Command="{Binding SelectAllInputsCommand}" Padding="8,4" FontSize="12"/>
+                                <TextBlock Text="Visible Sources / Inputs" FontWeight="Bold" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding AvailableInputs}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type connection:FilterItem}">
+                                        <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected}" Margin="5,2,15,2"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Outputs -->
+                    <Border Background="#2D2D30" CornerRadius="8" Padding="12">
+                        <StackPanel Spacing="8">
+                            <DockPanel>
+                                <Button Content="Select All" DockPanel.Dock="Right"
+                                        Command="{Binding SelectAllOutputsCommand}" Padding="8,4" FontSize="12"/>
+                                <TextBlock Text="Visible Destinations / Outputs" FontWeight="Bold" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding AvailableOutputs}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type connection:FilterItem}">
+                                        <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected}" Margin="5,2,15,2"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
             </StackPanel>
         </ScrollViewer>
     </DockPanel>

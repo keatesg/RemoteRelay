@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=RemoteRelay Configurator
+Comment=Hardware and routing configuration tool for RemoteRelay Server
+Exec=/usr/bin/remoterelay-config
+Icon=preferences-system
+Terminal=false
+Categories=Settings;HardwareSettings;System;Utility;

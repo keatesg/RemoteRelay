@@ -1,0 +1,72 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+        # Migrate existing client configuration and autostart for all users
+        for user_home in /home/* /root; do
+            [ -d "$user_home" ] || continue
+            user_name=$(basename "$user_home")
+            [ "$user_home" = "/root" ] && user_name="root"
+
+            target_conf_dir="$user_home/.config/RemoteRelay"
+            target_conf="$target_conf_dir/ClientConfig.json"
+
+            # 1. Migrate client configuration file if not already present
+            if [ ! -f "$target_conf" ]; then
+                src_conf=""
+                if [ -f "$user_home/RemoteRelay/client/ClientConfig.json" ]; then
+                    src_conf="$user_home/RemoteRelay/client/ClientConfig.json"
+                elif [ -f "$user_home/RemoteRelay/client/ServerDetails.json" ]; then
+                    src_conf="$user_home/RemoteRelay/client/ServerDetails.json"
+                elif [ -f "$user_home/.local/share/RemoteRelay/Client/ClientConfig.json" ]; then
+                    src_conf="$user_home/.local/share/RemoteRelay/Client/ClientConfig.json"
+                fi
+
+                if [ -n "$src_conf" ] && [ -f "$src_conf" ]; then
+                    echo "Migrating client configuration for user $user_name..."
+                    mkdir -p "$target_conf_dir"
+                    cp -a "$src_conf" "$target_conf"
+                    chown -R "$user_name:" "$target_conf_dir" 2>/dev/null || true
+                    chmod 644 "$target_conf"
+                fi
+            fi
+
+            # 2. Update existing desktop shortcut if it points to legacy launcher
+            desk_shortcut="$user_home/Desktop/RemoteRelay.desktop"
+            if [ -f "$desk_shortcut" ]; then
+                if grep -q "RemoteRelay/client" "$desk_shortcut" 2>/dev/null; then
+                    echo "Updating desktop shortcut at $desk_shortcut to use /usr/bin/remoterelay-client..."
+                    sed -i 's|Exec=.*|Exec=/usr/bin/remoterelay-client|g' "$desk_shortcut"
+                    sed -i 's|Path=.*|Path=/usr/bin|g' "$desk_shortcut"
+                fi
+            fi
+
+            # 3. Update XDG autostart entry if it points to legacy launcher
+            autostart_entry="$user_home/.config/autostart/remote-relay-client.desktop"
+            if [ -f "$autostart_entry" ]; then
+                if grep -q "RemoteRelay/client" "$autostart_entry" 2>/dev/null; then
+                    echo "Updating autostart entry at $autostart_entry to use /usr/bin/remoterelay-client..."
+                    sed -i 's|Exec=.*|Exec=/usr/bin/remoterelay-client|g' "$autostart_entry"
+                    sed -i 's|Path=.*|Path=/usr/bin|g' "$autostart_entry"
+                fi
+            fi
+
+            # 4. Update Wayfire autostart (Raspberry Pi OS Wayland)
+            wayfire_ini="$user_home/.config/wayfire.ini"
+            if [ -f "$wayfire_ini" ] && grep -q "remote-relay-client" "$wayfire_ini" 2>/dev/null; then
+                if grep -q "RemoteRelay/client" "$wayfire_ini" 2>/dev/null; then
+                    echo "Updating wayfire.ini autostart to use /usr/bin/remoterelay-client..."
+                    sed -i 's|remote-relay-client = .*|remote-relay-client = /usr/bin/remoterelay-client|g' "$wayfire_ini"
+                fi
+            fi
+        done
+
+        # Update desktop database
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database -q /usr/share/applications || true
+        fi
+        ;;
+esac
+
+exit 0

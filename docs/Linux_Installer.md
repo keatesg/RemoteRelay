@@ -94,10 +94,31 @@ The menu provides:
   (repair), roll back to the previously installed version, or uninstall.
 - **Logs** — view recent server logs, follow them live, or open the client log.
 
-> Routes, sources, output names, colours, port, inactive relay, TCP mirror and
-> the display options are edited from the **client's Setup screen**, which writes
-> them straight to the server. The `remoterelay` Configure menu deliberately
-> covers only the settings the client cannot reach.
+## Debian (.deb) Packages
+
+Debian packages are provided for Raspberry Pi OS and Debian-based systems:
+
+- `remoterelay-server_<version>_<arch>.deb`:
+  - Contains the **RemoteRelay Server** daemon (`/usr/lib/remoterelay/server/RemoteRelay.Server` symlinked to `/usr/bin/remoterelay-server`).
+  - Contains the **RemoteRelay Configurator** GUI (`/usr/lib/remoterelay/configurator/RemoteRelay.Configurator` symlinked to `/usr/bin/remoterelay-config`).
+  - Automatically installs and enables the systemd service `remote-relay-server.service`.
+  - Installs `/etc/remoterelay/config.json` as a package `conffile` (upgrades never overwrite your edits).
+  - Installs the Desktop launcher for the Configurator.
+- `remoterelay-client_<version>_<arch>.deb`:
+  - Contains the **RemoteRelay Touch Client** (`/usr/lib/remoterelay/client/RemoteRelay` symlinked to `/usr/bin/remoterelay-client`).
+  - Installs the Desktop launcher for the Client.
+
+### Installing Debian Packages
+
+```bash
+# Install Server (and Configurator)
+sudo apt install ./remoterelay-server_*.deb
+
+# Install Touch Client
+sudo apt install ./remoterelay-client_*.deb
+```
+
+> **Configuration Note:** All routing, hardware drivers, pins, and relay configuration belong strictly on the server (`/etc/remoterelay/config.json`). You can edit this file directly with any text editor (the server automatically hot-reloads it), or use the **RemoteRelay Configurator** desktop app (`remoterelay-config`). The touch client is dedicated to switching operations, server connection configuration, and local display filtering (showing/hiding specific inputs or outputs).
 
 ### Non-interactive commands
 

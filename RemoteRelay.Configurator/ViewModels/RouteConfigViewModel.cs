@@ -1,15 +1,15 @@
 using System;
-using ReactiveUI;
 using System.Windows.Input;
+using ReactiveUI;
+using RemoteRelay.Configurator.Services;
 
-namespace RemoteRelay.Setup;
+namespace RemoteRelay.Configurator.ViewModels;
 
-/// <summary>
-/// View model for a single output route row in an input card.
-/// </summary>
 public class RouteConfigViewModel : ViewModelBase
 {
     private readonly Func<Action<RouteConfigViewModel>> _getDeleteAction;
+    private readonly ConfiguratorClient? _client;
+    private readonly Func<string> _getSourceName;
 
     private string _outputName = string.Empty;
     public string OutputName
@@ -32,28 +32,7 @@ public class RouteConfigViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _activeLow, value);
     }
 
-    private bool _isRelayOn;
-    public bool IsRelayOn
-    {
-        get => _isRelayOn;
-        set
-        {
-            if (_isRelayOn != value)
-            {
-                this.RaiseAndSetIfChanged(ref _isRelayOn, value);
-                // Send test command when toggle changes
-                if (RelayPin > 0)
-                {
-                    _ = SwitcherClient.Instance.TestPinAsync(RelayPin, ActiveLow, value);
-                }
-            }
-        }
-    }
-
     private string _tcpMessage = string.Empty;
-    /// <summary>
-    /// TCP message to send when this route is activated.
-    /// </summary>
     public string TcpMessage
     {
         get => _tcpMessage;
@@ -61,20 +40,36 @@ public class RouteConfigViewModel : ViewModelBase
     }
 
     public ICommand DeleteRouteCommand { get; }
+    public ICommand TestRouteCommand { get; }
 
     public RouteConfigViewModel(
         string outputName,
         int relayPin,
         bool activeLow,
         string tcpMessage,
-        Func<Action<RouteConfigViewModel>> getDeleteAction)
+        Func<Action<RouteConfigViewModel>> getDeleteAction,
+        Func<string> getSourceName,
+        ConfiguratorClient? client = null)
     {
         _outputName = outputName;
         _relayPin = relayPin;
         _activeLow = activeLow;
         _tcpMessage = tcpMessage;
         _getDeleteAction = getDeleteAction;
+        _getSourceName = getSourceName;
+        _client = client;
 
         DeleteRouteCommand = ReactiveCommand.Create(() => _getDeleteAction()(this));
+        TestRouteCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            if (_client != null && _client.IsConnected && !string.IsNullOrWhiteSpace(_outputName))
+            {
+                var src = _getSourceName();
+                if (!string.IsNullOrWhiteSpace(src))
+                {
+                    await _client.SwitchSourceAsync(src, _outputName);
+                }
+            }
+        });
     }
 }

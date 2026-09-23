@@ -11,7 +11,6 @@ using ReactiveUI;
 using RemoteRelay.Common;
 using RemoteRelay.Connection;
 using RemoteRelay.MultiOutput;
-using RemoteRelay.Setup;
 using RemoteRelay.SingleOutput;
 using Zeroconf;
 using System.Reactive.Disposables;
@@ -91,15 +90,6 @@ public class MainWindowViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _showIpOnScreen, value);
     }
 
-    private bool _showSetupButton;
-    public bool ShowSetupButton
-    {
-        get => _showSetupButton;
-        set => this.RaiseAndSetIfChanged(ref _showSetupButton, value);
-    }
-
-    public ICommand OpenSetupCommand { get; }
-
     public ICommand OpenConnectionSettingsCommand { get; }
 
     // Set once the connection settings view has been offered this session, so a
@@ -112,10 +102,6 @@ public class MainWindowViewModel : ViewModelBase
 
         LoadOrMigrateConfig();
 
-        // Setup button is only shown when connected to localhost
-        ShowSetupButton = _clientConfig.IsLocalConnection;
-
-        OpenSetupCommand = ReactiveCommand.Create(OpenSetup);
         OpenConnectionSettingsCommand = ReactiveCommand.Create(OpenConnectionSettings);
 
         InitClient();
@@ -141,8 +127,8 @@ public class MainWindowViewModel : ViewModelBase
             .Subscribe(settings =>
             {
                 _currentSettings = settings;
-                // Only apply if the user isn't editing setup or connection settings
-                if (OperationViewModel is not SetupViewModel and not ConnectionSettingsViewModel)
+                // Only apply if the user isn't editing connection settings
+                if (OperationViewModel is not ConnectionSettingsViewModel)
                 {
                     ApplySettings(settings);
                 }
@@ -194,22 +180,6 @@ public class MainWindowViewModel : ViewModelBase
         _clientSubscriptions = null;
     }
 
-    private void OpenSetup()
-    {
-        if (_currentSettings.HasValue)
-        {
-            OperationViewModel = new SetupViewModel(_currentSettings.Value, CloseSetup);
-        }
-    }
-
-    private void CloseSetup()
-    {
-        if (_currentSettings.HasValue)
-        {
-            ApplySettings(_currentSettings.Value);
-        }
-    }
-
     private void OpenConnectionSettings()
     {
         _connectionPromptShown = true;
@@ -217,27 +187,45 @@ public class MainWindowViewModel : ViewModelBase
         OperationViewModel = new ConnectionSettingsViewModel(
             _clientConfig.Host,
             _clientConfig.Port,
-            onSave: (host, port) => _ = ApplyConnectionSettingsAsync(host, port),
+            availableInputs: _currentSettings?.Sources,
+            selectedInputs: _clientConfig.ShownInputs,
+            availableOutputs: _currentSettings?.Outputs,
+            selectedOutputs: _clientConfig.ShownOutputs,
+            onSave: (host, port, inputs, outputs) => _ = ApplyConnectionSettingsAsync(host, port, inputs, outputs),
             onCancel: CancelConnectionSettings);
-        ServerStatusMessage = "Editing connection settings…";
+        ServerStatusMessage = "Editing client settings…";
     }
 
-    private async Task ApplyConnectionSettingsAsync(string? host, int? port)
+    private async Task ApplyConnectionSettingsAsync(string? host, int? port, List<string>? shownInputs, List<string>? shownOutputs)
     {
-        _clientConfig.Host = host ?? string.Empty;
-        _clientConfig.Port = port;
-        // A newly chosen server invalidates the cached discovery result.
-        _clientConfig.LastDiscoveredHost = null;
-        _clientConfig.LastDiscoveredPort = null;
-        SaveConfig();
+        var targetHost = host ?? string.Empty;
+        bool hostChanged = !string.Equals(_clientConfig.Host, targetHost, StringComparison.OrdinalIgnoreCase) || _clientConfig.Port != port;
 
-        ShowSetupButton = _clientConfig.IsLocalConnection;
+        _clientConfig.Host = targetHost;
+        _clientConfig.Port = port;
+        _clientConfig.ShownInputs = shownInputs;
+        _clientConfig.ShownOutputs = shownOutputs;
+
+        if (hostChanged)
+        {
+            _clientConfig.LastDiscoveredHost = null;
+            _clientConfig.LastDiscoveredPort = null;
+        }
+
+        SaveConfig();
         OperationViewModel = null;
 
-        DisposeClientSubscriptions();
-        await SwitcherClient.ResetInstanceAsync();
-        InitClient();
-        await InitializeConnectionAsync();
+        if (hostChanged || !SwitcherClient.Instance.IsConnected)
+        {
+            DisposeClientSubscriptions();
+            await SwitcherClient.ResetInstanceAsync();
+            InitClient();
+            await InitializeConnectionAsync();
+        }
+        else if (_currentSettings.HasValue)
+        {
+            ApplySettings(_currentSettings.Value);
+        }
     }
 
     private void CancelConnectionSettings()
@@ -530,17 +518,8 @@ public class MainWindowViewModel : ViewModelBase
         // Handle unconfigured server
         if (!settings.IsConfigured)
         {
-            if (_clientConfig.IsLocalConnection)
-            {
-                _currentSettings = settings;
-                OperationViewModel = new SetupViewModel(settings, CloseSetup);
-                ServerStatusMessage = "Server not configured. Please set up routes below.";
-            }
-            else
-            {
-                OperationViewModel = null;
-                ServerStatusMessage = "Server is not configured. Please configure the server from a local client.";
-            }
+            OperationViewModel = null;
+            ServerStatusMessage = "Server is not configured. Please use RemoteRelay Configurator to set up routes.";
             return;
         }
 

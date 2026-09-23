@@ -281,10 +281,14 @@ public class Program
     {
         if (!File.Exists(configPath))
         {
-            Console.WriteLine($"No configuration file found at '{configPath}'. Creating default (unconfigured) config.");
-            var defaults = new AppSettings { ServerPort = 33101, ShowIpOnScreen = true, ShowClockOnScreen = true, FlashOnSelect = true, Logging = true };
-            var defaultJson = JsonSerializer.Serialize(defaults, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
-            File.WriteAllText(configPath, defaultJson);
+            var migrated = TryMigrateLegacyServerConfig(configPath);
+            if (!migrated)
+            {
+                Console.WriteLine($"No configuration file found at '{configPath}'. Creating default (unconfigured) config.");
+                var defaults = new AppSettings { ServerPort = 33101, ShowIpOnScreen = true, ShowClockOnScreen = true, FlashOnSelect = true, Logging = true };
+                var defaultJson = JsonSerializer.Serialize(defaults, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
+                File.WriteAllText(configPath, defaultJson);
+            }
         }
 
         var json = File.ReadAllText(configPath);
@@ -378,5 +382,58 @@ public class Program
         {
             // Don't throw from the exception handler
         }
+    }
+
+    private static bool TryMigrateLegacyServerConfig(string targetConfigPath)
+    {
+        try
+        {
+            if (OperatingSystem.IsLinux())
+            {
+                // 1. Check /etc/remoterelay/install.conf for recorded install base directory
+                const string installConf = "/etc/remoterelay/install.conf";
+                if (File.Exists(installConf))
+                {
+                    foreach (var line in File.ReadAllLines(installConf))
+                    {
+                        if (line.StartsWith("RR_CONF_BASE_DIR=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var baseDir = line.Substring("RR_CONF_BASE_DIR=".Length).Trim('"', '\'', ' ');
+                            var candidate = Path.Combine(baseDir, "server", "config.json");
+                            if (File.Exists(candidate))
+                            {
+                                Console.WriteLine($"Migrating legacy server configuration from '{candidate}' to '{targetConfigPath}'.");
+                                Directory.CreateDirectory(Path.GetDirectoryName(targetConfigPath)!);
+                                File.Copy(candidate, targetConfigPath, overwrite: false);
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                // 2. Check /home/* and /root
+                var homeDir = "/home";
+                if (Directory.Exists(homeDir))
+                {
+                    foreach (var userDir in Directory.GetDirectories(homeDir))
+                    {
+                        var candidate = Path.Combine(userDir, "RemoteRelay", "server", "config.json");
+                        if (File.Exists(candidate))
+                        {
+                            Console.WriteLine($"Migrating legacy server configuration from '{candidate}' to '{targetConfigPath}'.");
+                            Directory.CreateDirectory(Path.GetDirectoryName(targetConfigPath)!);
+                            File.Copy(candidate, targetConfigPath, overwrite: false);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Failed checking legacy server configuration: {ex.Message}");
+        }
+
+        return false;
     }
 }
