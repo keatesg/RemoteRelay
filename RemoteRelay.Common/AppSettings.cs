@@ -34,6 +34,28 @@ public class K8090Settings
     public string Port { get; set; } = string.Empty;
 }
 
+public class SainSmartSettings
+{
+    public string Port { get; set; } = string.Empty;
+    public int Channels { get; set; } = 4;
+    public int BaudRate { get; set; } = 9600;
+}
+
+public class LcusSettings
+{
+    public string Port { get; set; } = string.Empty;
+    public int Channels { get; set; } = 4;
+    public int BaudRate { get; set; } = 9600;
+}
+
+public class ModbusSettings
+{
+    public string Port { get; set; } = string.Empty;
+    public int Channels { get; set; } = 8;
+    public int BaudRate { get; set; } = 9600;
+    public byte SlaveId { get; set; } = 1;
+}
+
 public class InactiveRelaySettings
 {
     public int Pin { get; set; }
@@ -99,8 +121,11 @@ public struct AppSettings
     public bool Logging { get; set; }
     public string LogoFile { get; set; }
     public bool UseMockGpio { get; set; }
-    public string? RelayDriver { get; set; } // "Auto" | "Mock" | "RpiGpio" | "K8090"; null/Auto preserves legacy behaviour
+    public string? RelayDriver { get; set; } // "Auto" | "Mock" | "RpiGpio" | "K8090" | "SainSmart" | "LCUS" | "ModbusRTU"; null/Auto preserves legacy behaviour
     public K8090Settings? K8090 { get; set; }
+    public SainSmartSettings? SainSmart { get; set; }
+    public LcusSettings? LCUS { get; set; }
+    public ModbusSettings? ModbusRTU { get; set; }
     public string ThemePalette { get; set; }
 
     // Parameterless constructor for struct initialization

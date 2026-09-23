@@ -31,16 +31,19 @@
             <ListItem Text="Auto-detect"     Value="Auto" />
             <ListItem Text="Mock (no hardware)" Value="Mock" />
             <ListItem Text="Velleman K8090"  Value="K8090" />
+            <ListItem Text="SainSmart / KMtronic" Value="SainSmart" />
+            <ListItem Text="LC Technology / Seeit" Value="LCUS" />
+            <ListItem Text="Modbus RTU / Waveshare" Value="ModbusRTU" />
             <ListItem Text="Raspberry Pi GPIO" Value="RpiGpio" />
           </ComboBox>
         </Control>
 
         <Control Id="K8090PortLabel" Type="Text" X="20" Y="125" Width="100" Height="15"
-                 Text="K8090 serial &amp;port:" />
+                 Text="Serial &amp;port:" />
         <Control Id="K8090PortCombo" Type="ComboBox" X="130" Y="123" Width="120" Height="18"
                  Property="K8090_PORT" ComboList="yes" Sorted="yes" />
         <Control Id="K8090PortHint" Type="Text" X="20" Y="143" Width="330" Height="20" Transparent="yes"
-                 Text="Only used when the relay driver is set to K8090. Pick the COM port the K8090 is connected to (or type one)." />
+                 Text="Only used when the relay driver is set to a serial device (K8090, SainSmart, LCUS, ModbusRTU). Pick the COM port the device is connected to (or type one)." />
 
         <Control Id="LogoFileLabel" Type="Text" X="20" Y="175" Width="100" Height="15"
                  Text="&amp;Logo file (optional):" />

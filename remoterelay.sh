@@ -83,13 +83,18 @@ build_status() {
     svc_state="$active ($enabled at boot)"
   fi
 
-  local sver cver port driver k8090 ips
+  local sver cver port driver k8090 sainsmart lcus modbus ips
   sver="$(rr_binary_version "$SERVER_INSTALL_DIR/RemoteRelay.Server")"
   cver="$(rr_binary_version "$CLIENT_INSTALL_DIR/RemoteRelay")"
   port="$(rr_json_get "$SERVER_CONFIG" '.ServerPort')"; port="${port:-not set}"
   driver="$(rr_json_get "$SERVER_CONFIG" '.RelayDriver')"; driver="${driver:-Auto}"
   k8090="$(rr_json_get "$SERVER_CONFIG" '.K8090.Port')"
+  sainsmart="$(rr_json_get "$SERVER_CONFIG" '.SainSmart.Port')"
+  lcus="$(rr_json_get "$SERVER_CONFIG" '.LCUS.Port')"
+  modbus="$(rr_json_get "$SERVER_CONFIG" '.ModbusRTU.Port')"
   ips="$(hostname -I 2>/dev/null | tr -s ' ' | sed 's/ $//')"; ips="${ips:-unknown}"
+
+  local sport="${k8090:-${sainsmart:-${lcus:-$modbus}}}"
 
   cat <<EOF
 Install user : $APP_USER
@@ -99,7 +104,7 @@ Server
   installed  : $(rr_server_installed && echo "yes ($sver)" || echo "no")
   service    : $svc_state
   listen port: $port
-  relay driver: $driver$( [ -n "$k8090" ] && echo " ($k8090)" )
+  relay driver: $driver$( [ -n "$sport" ] && echo " ($sport)" )
   addresses  : $ips
 
 Client
@@ -200,10 +205,13 @@ cfg_relay_driver() {
   local cur; cur="$(rr_json_get "$SERVER_CONFIG" '.RelayDriver')"; cur="${cur:-Auto}"
   local pick
   pick="$(ui_radiolist "Relay driver" "Which relay backend should the server use?" "$cur" \
-    Auto    "Auto-detect (GPIO on a Pi, otherwise mock)" \
-    RpiGpio "Raspberry Pi GPIO relay HAT" \
-    K8090   "Velleman K8090 USB relay board" \
-    Mock    "Mock driver (no hardware, for testing)")" || return 0
+    Auto      "Auto-detect (GPIO on a Pi, otherwise mock)" \
+    RpiGpio   "Raspberry Pi GPIO relay HAT" \
+    K8090     "Velleman K8090 USB relay board" \
+    SainSmart "SainSmart / KMtronic USB relay module" \
+    LCUS      "LC Technology / Seeit USB relay module" \
+    ModbusRTU "Modbus RTU / Waveshare industrial relay" \
+    Mock      "Mock driver (no hardware, for testing)")" || return 0
   [ -z "$pick" ] && return 0
 
   if [ "$pick" = "K8090" ]; then
@@ -222,6 +230,57 @@ cfg_relay_driver() {
     [ -z "$port" ] && { ui_warn "No port given; aborting."; return 0; }
     if rr_json_set "$SERVER_CONFIG" '.RelayDriver=$d | .K8090=((.K8090 // {}) + {Port:$p})' --arg d "K8090" --arg p "$port"; then
       ui_ok "Relay driver set to K8090 on $port."
+    fi
+  elif [ "$pick" = "SainSmart" ]; then
+    local -a opts=()
+    local p
+    for p in /dev/serial/by-id/* /dev/ttyACM* /dev/ttyUSB*; do
+      [ -e "$p" ] && opts+=("$p" "serial port")
+    done
+    opts+=("__manual__" "Enter a path manually")
+    local port
+    port="$(ui_menu "SainSmart serial port" "Select the SainSmart device:" "${opts[@]}")" || return 0
+    if [ "$port" = "__manual__" ] || [ -z "$port" ]; then
+      local existing; existing="$(rr_json_get "$SERVER_CONFIG" '.SainSmart.Port')"
+      port="$(ui_inputbox "SainSmart serial port" "Device path (e.g. /dev/ttyUSB0):" "${existing:-/dev/ttyUSB0}")"
+    fi
+    [ -z "$port" ] && { ui_warn "No port given; aborting."; return 0; }
+    if rr_json_set "$SERVER_CONFIG" '.RelayDriver=$d | .SainSmart=((.SainSmart // {}) + {Port:$p, Channels:4})' --arg d "SainSmart" --arg p "$port"; then
+      ui_ok "Relay driver set to SainSmart on $port."
+    fi
+  elif [ "$pick" = "LCUS" ]; then
+    local -a opts=()
+    local p
+    for p in /dev/serial/by-id/* /dev/ttyACM* /dev/ttyUSB*; do
+      [ -e "$p" ] && opts+=("$p" "serial port")
+    done
+    opts+=("__manual__" "Enter a path manually")
+    local port
+    port="$(ui_menu "LCUS serial port" "Select the LCUS device:" "${opts[@]}")" || return 0
+    if [ "$port" = "__manual__" ] || [ -z "$port" ]; then
+      local existing; existing="$(rr_json_get "$SERVER_CONFIG" '.LCUS.Port')"
+      port="$(ui_inputbox "LCUS serial port" "Device path (e.g. /dev/ttyUSB0):" "${existing:-/dev/ttyUSB0}")"
+    fi
+    [ -z "$port" ] && { ui_warn "No port given; aborting."; return 0; }
+    if rr_json_set "$SERVER_CONFIG" '.RelayDriver=$d | .LCUS=((.LCUS // {}) + {Port:$p, Channels:4})' --arg d "LCUS" --arg p "$port"; then
+      ui_ok "Relay driver set to LCUS on $port."
+    fi
+  elif [ "$pick" = "ModbusRTU" ]; then
+    local -a opts=()
+    local p
+    for p in /dev/serial/by-id/* /dev/ttyACM* /dev/ttyUSB*; do
+      [ -e "$p" ] && opts+=("$p" "serial port")
+    done
+    opts+=("__manual__" "Enter a path manually")
+    local port
+    port="$(ui_menu "ModbusRTU serial port" "Select the Modbus RTU device:" "${opts[@]}")" || return 0
+    if [ "$port" = "__manual__" ] || [ -z "$port" ]; then
+      local existing; existing="$(rr_json_get "$SERVER_CONFIG" '.ModbusRTU.Port')"
+      port="$(ui_inputbox "ModbusRTU serial port" "Device path (e.g. /dev/ttyUSB0):" "${existing:-/dev/ttyUSB0}")"
+    fi
+    [ -z "$port" ] && { ui_warn "No port given; aborting."; return 0; }
+    if rr_json_set "$SERVER_CONFIG" '.RelayDriver=$d | .ModbusRTU=((.ModbusRTU // {}) + {Port:$p, Channels:8, SlaveId:1})' --arg d "ModbusRTU" --arg p "$port"; then
+      ui_ok "Relay driver set to ModbusRTU on $port."
     fi
   else
     rr_json_set "$SERVER_CONFIG" '.RelayDriver=$d' --arg d "$pick" && ui_ok "Relay driver set to $pick."

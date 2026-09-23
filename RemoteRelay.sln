@@ -13,6 +13,8 @@ Project("{B7DD6F7E-DEF8-4E67-B5B7-07EF123DB6F0}") = "RemoteRelay.Installer", "Re
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RemoteRelay.Installer.CustomActions", "RemoteRelay.Installer.CustomActions\RemoteRelay.Installer.CustomActions.csproj", "{05698BC5-5EF9-4704-BD2A-E64219D23EA0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RemoteRelay.Tests", "RemoteRelay.Tests\RemoteRelay.Tests.csproj", "{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,6 +73,18 @@ Global
 		{05698BC5-5EF9-4704-BD2A-E64219D23EA0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{05698BC5-5EF9-4704-BD2A-E64219D23EA0}.Release|x64.ActiveCfg = Release|Any CPU
 		{05698BC5-5EF9-4704-BD2A-E64219D23EA0}.Release|x86.ActiveCfg = Release|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Debug|x64.Build.0 = Debug|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Debug|x86.Build.0 = Debug|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Release|x64.ActiveCfg = Release|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Release|x64.Build.0 = Release|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Release|x86.ActiveCfg = Release|Any CPU
+		{7F707EAB-60E4-42E1-A070-43ECE6A1D4D3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -184,10 +184,16 @@ public static class AppSettingsValidator
             return;
         }
 
-        var known = new[] { "Mock", "RpiGpio", "Gpio", "Rpi", "K8090", "Velleman" };
+        var known = new[]
+        {
+            "Mock", "RpiGpio", "Gpio", "Rpi", "K8090", "Velleman",
+            "SainSmart", "SainsmartUsb", "KMtronic",
+            "LCUS", "Seeit", "LCTech",
+            "ModbusRTU", "Modbus", "Waveshare"
+        };
         if (!known.Any(k => string.Equals(k, driver, StringComparison.OrdinalIgnoreCase)))
         {
-            errors.Add($"RelayDriver '{settings.RelayDriver}' is not recognised. Valid values: Auto, Mock, RpiGpio, K8090.");
+            errors.Add($"RelayDriver '{settings.RelayDriver}' is not recognised. Valid values: Auto, Mock, RpiGpio, K8090, SainSmart, LCUS, ModbusRTU.");
             return;
         }
 
@@ -213,6 +219,87 @@ public static class AppSettingsValidator
             if (settings.InactiveRelay != null && (settings.InactiveRelay.Pin < 1 || settings.InactiveRelay.Pin > 8))
             {
                 errors.Add($"InactiveRelay.Pin {settings.InactiveRelay.Pin} is out of K8090 channel range 1-8.");
+            }
+        }
+        else if (string.Equals(driver, "SainSmart", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(driver, "SainsmartUsb", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(driver, "KMtronic", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(settings.SainSmart?.Port))
+            {
+                warnings.Add($"RelayDriver is '{driver}' but SainSmart.Port is not set; relay switching will be inoperative until a port is configured in config.json.");
+            }
+
+            var maxChannels = settings.SainSmart?.Channels > 0 ? settings.SainSmart.Channels : 4;
+
+            if (settings.Routes != null)
+            {
+                foreach (var route in settings.Routes)
+                {
+                    if (route.RelayPin < 1 || route.RelayPin > maxChannels)
+                    {
+                        errors.Add($"Route {route.SourceName}->{route.OutputName} uses channel {route.RelayPin}; {driver} only supports channels 1-{maxChannels}.");
+                    }
+                }
+            }
+
+            if (settings.InactiveRelay != null && (settings.InactiveRelay.Pin < 1 || settings.InactiveRelay.Pin > maxChannels))
+            {
+                errors.Add($"InactiveRelay.Pin {settings.InactiveRelay.Pin} is out of {driver} channel range 1-{maxChannels}.");
+            }
+        }
+        else if (string.Equals(driver, "LCUS", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(driver, "Seeit", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(driver, "LCTech", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(settings.LCUS?.Port))
+            {
+                warnings.Add($"RelayDriver is '{driver}' but LCUS.Port is not set; relay switching will be inoperative until a port is configured in config.json.");
+            }
+
+            var maxChannels = settings.LCUS?.Channels > 0 ? settings.LCUS.Channels : 4;
+
+            if (settings.Routes != null)
+            {
+                foreach (var route in settings.Routes)
+                {
+                    if (route.RelayPin < 1 || route.RelayPin > maxChannels)
+                    {
+                        errors.Add($"Route {route.SourceName}->{route.OutputName} uses channel {route.RelayPin}; {driver} only supports channels 1-{maxChannels}.");
+                    }
+                }
+            }
+
+            if (settings.InactiveRelay != null && (settings.InactiveRelay.Pin < 1 || settings.InactiveRelay.Pin > maxChannels))
+            {
+                errors.Add($"InactiveRelay.Pin {settings.InactiveRelay.Pin} is out of {driver} channel range 1-{maxChannels}.");
+            }
+        }
+        else if (string.Equals(driver, "ModbusRTU", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(driver, "Modbus", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(driver, "Waveshare", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(settings.ModbusRTU?.Port))
+            {
+                warnings.Add($"RelayDriver is '{driver}' but ModbusRTU.Port is not set; relay switching will be inoperative until a port is configured in config.json.");
+            }
+
+            var maxChannels = settings.ModbusRTU?.Channels > 0 ? settings.ModbusRTU.Channels : 8;
+
+            if (settings.Routes != null)
+            {
+                foreach (var route in settings.Routes)
+                {
+                    if (route.RelayPin < 1 || route.RelayPin > maxChannels)
+                    {
+                        errors.Add($"Route {route.SourceName}->{route.OutputName} uses channel {route.RelayPin}; {driver} only supports channels 1-{maxChannels}.");
+                    }
+                }
+            }
+
+            if (settings.InactiveRelay != null && (settings.InactiveRelay.Pin < 1 || settings.InactiveRelay.Pin > maxChannels))
+            {
+                errors.Add($"InactiveRelay.Pin {settings.InactiveRelay.Pin} is out of {driver} channel range 1-{maxChannels}.");
             }
         }
     }

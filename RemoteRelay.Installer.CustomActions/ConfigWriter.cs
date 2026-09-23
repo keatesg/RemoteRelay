@@ -27,6 +27,9 @@ namespace RemoteRelay.Installer.CustomActions
                     .Replace("{{SERVER_PORT}}", NumericOrDefault(data, "ServerPort", "33101"))
                     .Replace("{{RELAY_DRIVER}}", JsonEscape(ValueOrDefault(data, "RelayDriver", "Auto")))
                     .Replace("{{K8090_PORT}}", JsonEscape(ValueOrDefault(data, "K8090Port", "")))
+                    .Replace("{{SAINSMART_PORT}}", JsonEscape(ValueOrDefault(data, "SainSmartPort", "")))
+                    .Replace("{{LCUS_PORT}}", JsonEscape(ValueOrDefault(data, "LcusPort", "")))
+                    .Replace("{{MODBUS_PORT}}", JsonEscape(ValueOrDefault(data, "ModbusPort", "")))
                     .Replace("{{LOGO_FILE}}", JsonEscape(ValueOrDefault(data, "LogoFile", "")));
 
                 Directory.CreateDirectory(folder);

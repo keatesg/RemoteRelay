@@ -26,17 +26,22 @@ The `RelayDriver` key selects which relay hardware the server drives:
 | `"Auto"` (default) | Auto-detect: Raspberry Pi GPIO when `/sys/class/gpio` is present, otherwise Mock. |
 | `"RpiGpio"` | Raspberry Pi GPIO header (also accepts `"Gpio"`, `"Rpi"`). |
 | `"K8090"` | Velleman K8090 / VM8090 8-channel USB relay card (also accepts `"Velleman"`). |
+| `"SainSmart"` | SainSmart USB relay module, also compatible with KMtronic (also accepts `"SainsmartUsb"`, `"KMtronic"`). |
+| `"LCUS"` | LC Technology / Seeit USB relay module (also accepts `"Seeit"`, `"LCTech"`). |
+| `"ModbusRTU"` | Modbus RTU serial relay modules e.g. Waveshare, Dingtian (also accepts `"Modbus"`, `"Waveshare"`). |
 | `"Mock"` | No hardware; logs switches only. Useful for testing. |
 
 ```json
-"RelayDriver": "K8090",
-"K8090": {
-  "Port": "COM3"
+"RelayDriver": "LCUS",
+"LCUS": {
+  "Port": "COM3",
+  "Channels": 4,
+  "BaudRate": 9600
 }
 ```
 
 - If `RelayDriver` is omitted or set to `"Auto"`, the legacy auto-detect behaviour applies (the older `UseMockGpio` flag still forces Mock).
-- The driver is applied live: editing `RelayDriver` or `K8090.Port` reloads the driver without restarting the server.
+- The driver is applied live: editing `RelayDriver` or driver port settings reloads the driver without restarting the server.
 
 ### K8090 (Velleman USB relay card)
 
@@ -50,6 +55,37 @@ The driver connects to the card on a background thread and keeps hardware and so
 
 - **Auto-reconnect** — if the card is absent at startup, unplugged, or power-cycled, the driver keeps retrying and reconnects on its own. No config reload is needed, and a source switched while the card is offline is remembered and applied the moment it returns.
 - **Status polling / drift detection** — the driver periodically reads the card's actual relay states. If they diverge from what RemoteRelay intends (a dropped command, or the card's own on-board buttons/timers), it logs a warning and re-asserts the intended state. Software routing is authoritative.
+
+### SainSmart / KMtronic (USB relay module)
+
+Required when `RelayDriver` is `"SainSmart"` or `"KMtronic"`.
+
+- `Port` (string): the serial port the module enumerates as — e.g. `COM3` on Windows, `/dev/ttyUSB0` or `/dev/serial/by-id/...` on Linux.
+- `Channels` (integer, optional, default `4`): the number of relay channels on the board (e.g. `4` for the 4-channel module, `8` for the 8-channel module).
+- `BaudRate` (integer, optional, default `9600`): serial communication baud rate (defaults to standard 9600 baud, 8N1).
+
+Uses the standard 3-byte binary command protocol: `[0xFF, (byte)Channel, (byte)(ON=0x01, OFF=0x00)]`. Compatible with SainSmart USB boards and KMtronic USB relay modules.
+
+### LCUS / Seeit (USB relay module)
+
+Required when `RelayDriver` is `"LCUS"`, `"Seeit"`, or `"LCTech"`.
+
+- `Port` (string): the serial port the module enumerates as — e.g. `COM3` on Windows, `/dev/ttyUSB0` or `/dev/serial/by-id/...` on Linux.
+- `Channels` (integer, optional, default `4`): number of channels on the board (1, 2, 4, or 8).
+- `BaudRate` (integer, optional, default `9600`): baud rate (defaults to 9600 baud, 8N1).
+
+Uses the 4-byte checksummed command protocol: `[0xA0, (byte)Channel, (byte)(ON=0x01, OFF=0x00), (byte)Checksum]`. Compatible with LC Technology (LCUS-1, LCUS-2, LCUS-4, LCUS-8), Seeit (USBB-RELAY04, USBM-RELAY01 from RS Components), NOYITO, HiLetgo, and Diymore boards.
+
+### Modbus RTU (Industrial / Waveshare relay module)
+
+Required when `RelayDriver` is `"ModbusRTU"`, `"Modbus"`, or `"Waveshare"`.
+
+- `Port` (string): the serial port the module enumerates as — e.g. `COM3` on Windows, `/dev/ttyUSB0` or `/dev/serial/by-id/...` on Linux.
+- `Channels` (integer, optional, default `8`): number of channels on the board.
+- `BaudRate` (integer, optional, default `9600`): baud rate (defaults to 9600 baud, 8N1).
+- `SlaveId` (integer, optional, default `1`): Modbus RTU device slave address.
+
+Uses standard Modbus RTU Function 0x05 (Write Single Coil) with 16-bit CRC checksumming. Compatible with Waveshare USB/RS485 relay modules, Dingtian, and commercial DIN-rail relay banks.
 
 ## Complete Configuration Example
 
@@ -121,8 +157,8 @@ An array defining all possible source-to-output connections and their correspond
 **Properties:**
 - `SourceName` (string): The name of the input source (e.g., "Input 1", "Studio A", "CD Player")
 - `OutputName` (string): The name of the output destination (e.g., "Output 1", "Transmitter", "Monitor")
-- `RelayPin` (integer): The relay this route controls. With the GPIO driver this is the GPIO pin number (BCM numbering); with the [K8090 driver](#k8090-velleman-usb-relay-card) it is the relay channel (`1`–`8`).
-- `ActiveLow` (boolean): GPIO driver only (ignored by K8090)
+- `RelayPin` (integer): The relay this route controls. With the GPIO driver this is the GPIO pin number (BCM numbering); with the [K8090 driver](#k8090-velleman-usb-relay-card) it is the relay channel (`1`–`8`); with the [SainSmart driver](#sainsmart-usb-relay-module) it is the relay channel (`1`–`4`, or configured `Channels`).
+- `ActiveLow` (boolean): GPIO driver only (ignored by K8090 and SainSmart)
   - `true`: Relay activates when pin is LOW (common for most relay HATs)
   - `false`: Relay activates when pin is HIGH
 

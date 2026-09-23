@@ -23,9 +23,9 @@ The bootstrap (`get.sh`):
    with a warning.)
 
 > **x64 note:** on a PC/NUC the client runs normally, and the server works with
-> the **K8090 USB** relay driver (or Mock). The Raspberry Pi GPIO driver is
+> the **K8090 USB** or **SainSmart USB** relay driver (or Mock). The Raspberry Pi GPIO driver is
 > unavailable on x86_64, so leave the relay driver on `Auto`/`Mock` unless you
-> have a K8090.
+> have a USB relay device.
 
 ### Options
 
@@ -83,8 +83,8 @@ The menu provides:
   relay driver, and client auto-start state.
 - **Service** — start / stop / restart / enable / disable the server.
 - **Configure** — the options that are *not* set from the client's Setup screen:
-  - **Relay driver** — `Auto`, `RpiGpio`, `K8090`, or `Mock`; for K8090 you can
-    pick the serial port from the detected devices.
+  - **Relay driver** — `Auto`, `RpiGpio`, `K8090`, `SainSmart`, or `Mock`; for K8090 and
+    SainSmart you can pick the serial port from the detected devices.
   - **UDP control API port** — enable/disable the UDP switching API.
   - **Default source** — the source selected automatically when idle.
   - **Client connection** — auto-discover the server or use a fixed IP/hostname.

@@ -8,6 +8,19 @@
   "K8090": {
     "Port": "{{K8090_PORT}}"
   },
+  "SainSmart": {
+    "Port": "{{SAINSMART_PORT}}",
+    "Channels": 4
+  },
+  "LCUS": {
+    "Port": "{{LCUS_PORT}}",
+    "Channels": 4
+  },
+  "ModbusRTU": {
+    "Port": "{{MODBUS_PORT}}",
+    "Channels": 8,
+    "SlaveId": 1
+  },
   "FlashOnSelect": true,
   "ShowIpOnScreen": true,
   "ShowClockOnScreen": true,

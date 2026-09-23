@@ -240,7 +240,7 @@
     <SetProperty Id="WriteServerConfig"
                  Before="WriteServerConfig"
                  Sequence="execute"
-                 Value="InstallFolder=[ServerDataFolder];ServerPort=[SERVER_PORT];RelayDriver=[RELAY_DRIVER];K8090Port=[K8090_PORT];LogoFile=[LOGO_FILE]" />
+                 Value="InstallFolder=[ServerDataFolder];ServerPort=[SERVER_PORT];RelayDriver=[RELAY_DRIVER];K8090Port=[K8090_PORT];SainSmartPort=[K8090_PORT];LcusPort=[K8090_PORT];ModbusPort=[K8090_PORT];LogoFile=[LOGO_FILE]" />
 
     <SetProperty Id="WriteClientConfig"
                  Before="WriteClientConfig"
