@@ -4,3 +4,5 @@
 get.sh text eol=lf
 remoterelay.sh text eol=lf
 lib/* text eol=lf
+packaging/debian/*/DEBIAN/* text eol=lf
+packaging/debian/*/bin/* text eol=lf

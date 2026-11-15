@@ -1,9 +1,87 @@
 #!/bin/sh
 set -e
 
+cleanup_empty_legacy_parent() {
+    base_dir="$1"
+    [ -d "$base_dir" ] || return 0
+    if [ ! -d "$base_dir/server" ] && [ ! -d "$base_dir/Server" ]; then
+        rm -rf "$base_dir/lib" "$base_dir/update.sh" "$base_dir/uninstall.sh"
+        rmdir "$base_dir" 2>/dev/null || true
+    fi
+}
+
+cleanup_shared_legacy_tools() {
+    for udir in /home/* /root; do
+        [ -d "$udir" ] || continue
+        if [ -d "$udir/RemoteRelay/server" ] || [ -d "$udir/RemoteRelay/client" ] || \
+           [ -d "$udir/.local/share/RemoteRelay/Server" ] || [ -d "$udir/.local/share/RemoteRelay/Client" ]; then
+            return 0
+        fi
+    done
+
+    rm -f /usr/local/bin/remoterelay
+    rm -rf /usr/local/lib/remoterelay
+    rm -f /etc/remoterelay/install.conf /etc/remoterelay/rollback.conf
+}
+
+has_legacy_client_ref() {
+    grep -qE "RemoteRelay/[Cc]lient|start-client\.sh" "$1" 2>/dev/null
+}
+
+update_desktop_entry_exec() {
+    file="$1"
+    user_name="$2"
+    preserve_xset="${3:-0}"
+
+    if [ "$preserve_xset" = "1" ] && grep -q "xset" "$file" 2>/dev/null; then
+        sed -i "s|^Exec=.*|Exec=sh -c 'xset s noblank; xset s off; xset -dpms; exec /usr/bin/remoterelay-client'|" "$file"
+    else
+        sed -i 's|^Exec=.*|Exec=/usr/bin/remoterelay-client|' "$file"
+    fi
+    if grep -q '^Path=' "$file" 2>/dev/null; then
+        sed -i 's|^Path=.*|Path=/usr/bin|' "$file"
+    fi
+    chown "$user_name:" "$file" 2>/dev/null || true
+}
+
+relaunch_client_for_user() {
+    user_name="$1"
+    uid=$(id -u "$user_name" 2>/dev/null || true)
+    [ -n "$uid" ] || return 0
+    runtime_dir="/run/user/$uid"
+
+    wayland_disp=""
+    if [ -d "$runtime_dir" ]; then
+        for sock in "$runtime_dir"/wayland-[0-9]*; do
+            [ -S "$sock" ] || continue
+            wayland_disp=$(basename "$sock")
+            break
+        done
+    fi
+
+    x11_disp=""
+    if [ -d /tmp/.X11-unix ]; then
+        for xsock in /tmp/.X11-unix/X*; do
+            [ -S "$xsock" ] || continue
+            x11_disp=":${xsock#/tmp/.X11-unix/X}"
+            break
+        done
+    fi
+
+    # Do not attempt GUI launch on headless systems with no active display session
+    [ -n "$wayland_disp" ] || [ -n "$x11_disp" ] || return 0
+
+    echo "Starting RemoteRelay Client for $user_name..."
+    env_cmd=""
+    [ -d "$runtime_dir" ] && env_cmd="${env_cmd}export XDG_RUNTIME_DIR='$runtime_dir'; "
+    [ -n "$wayland_disp" ] && env_cmd="${env_cmd}export WAYLAND_DISPLAY='$wayland_disp'; "
+    [ -n "$x11_disp" ] && env_cmd="${env_cmd}export DISPLAY='$x11_disp'; "
+    su -s /bin/sh "$user_name" -c "${env_cmd}nohup /usr/bin/remoterelay-client >/dev/null 2>&1 &" >/dev/null 2>&1 || true
+}
+
 case "$1" in
     configure)
-        # Migrate existing client configuration and autostart for all users
+        # Migrate existing client configuration, shortcuts, autostart, and clean old files
         for user_home in /home/* /root; do
             [ -d "$user_home" ] || continue
             user_name=$(basename "$user_home")
@@ -21,6 +99,8 @@ case "$1" in
                     src_conf="$user_home/RemoteRelay/client/ServerDetails.json"
                 elif [ -f "$user_home/.local/share/RemoteRelay/Client/ClientConfig.json" ]; then
                     src_conf="$user_home/.local/share/RemoteRelay/Client/ClientConfig.json"
+                elif [ -f "$user_home/.local/share/RemoteRelay/Client/ServerDetails.json" ]; then
+                    src_conf="$user_home/.local/share/RemoteRelay/Client/ServerDetails.json"
                 fi
 
                 if [ -n "$src_conf" ] && [ -f "$src_conf" ]; then
@@ -34,38 +114,96 @@ case "$1" in
 
             # 2. Update existing desktop shortcut if it points to legacy launcher
             desk_shortcut="$user_home/Desktop/RemoteRelay.desktop"
-            if [ -f "$desk_shortcut" ]; then
-                if grep -q "RemoteRelay/client" "$desk_shortcut" 2>/dev/null; then
-                    echo "Updating desktop shortcut at $desk_shortcut to use /usr/bin/remoterelay-client..."
-                    sed -i 's|Exec=.*|Exec=/usr/bin/remoterelay-client|g' "$desk_shortcut"
-                    sed -i 's|Path=.*|Path=/usr/bin|g' "$desk_shortcut"
-                fi
+            if [ -f "$desk_shortcut" ] && has_legacy_client_ref "$desk_shortcut"; then
+                echo "Updating desktop shortcut at $desk_shortcut to use /usr/bin/remoterelay-client..."
+                update_desktop_entry_exec "$desk_shortcut" "$user_name" 0
             fi
 
-            # 3. Update XDG autostart entry if it points to legacy launcher
+            # 3. Update XDG autostart entry if it points to legacy launcher (preserving xset kiosk options)
             autostart_entry="$user_home/.config/autostart/remote-relay-client.desktop"
-            if [ -f "$autostart_entry" ]; then
-                if grep -q "RemoteRelay/client" "$autostart_entry" 2>/dev/null; then
-                    echo "Updating autostart entry at $autostart_entry to use /usr/bin/remoterelay-client..."
-                    sed -i 's|Exec=.*|Exec=/usr/bin/remoterelay-client|g' "$autostart_entry"
-                    sed -i 's|Path=.*|Path=/usr/bin|g' "$autostart_entry"
-                fi
+            if [ -f "$autostart_entry" ] && has_legacy_client_ref "$autostart_entry"; then
+                echo "Updating autostart entry at $autostart_entry to use /usr/bin/remoterelay-client..."
+                update_desktop_entry_exec "$autostart_entry" "$user_name" 1
             fi
 
-            # 4. Update Wayfire autostart (Raspberry Pi OS Wayland)
+            # 4. Update Wayfire autostart (Raspberry Pi OS Wayland) and deduplicate entries
             wayfire_ini="$user_home/.config/wayfire.ini"
             if [ -f "$wayfire_ini" ] && grep -q "remote-relay-client" "$wayfire_ini" 2>/dev/null; then
-                if grep -q "RemoteRelay/client" "$wayfire_ini" 2>/dev/null; then
+                if has_legacy_client_ref "$wayfire_ini"; then
                     echo "Updating wayfire.ini autostart to use /usr/bin/remoterelay-client..."
-                    sed -i 's|remote-relay-client = .*|remote-relay-client = /usr/bin/remoterelay-client|g' "$wayfire_ini"
+                    tmp_wf=$(mktemp)
+                    awk '
+                        /^[ \t]*remote-relay-client[ \t]*=/ {
+                            if (!seen) {
+                                print "remote-relay-client = /usr/bin/remoterelay-client"
+                                seen = 1
+                            }
+                            next
+                        }
+                        { print }
+                    ' "$wayfire_ini" > "$tmp_wf" && mv "$tmp_wf" "$wayfire_ini"
+                    chown "$user_name:" "$wayfire_ini" 2>/dev/null || true
                 fi
             fi
+
+            # 5. Update very old LXDE autostart entries if present
+            for lx_autostart in "$user_home/.config/lxsession"/*/autostart; do
+                [ -f "$lx_autostart" ] || continue
+                if has_legacy_client_ref "$lx_autostart"; then
+                    echo "Updating LXDE autostart at $lx_autostart to use /usr/bin/remoterelay-client..."
+                    sed -i -E 's|^@?.*(RemoteRelay/[Cc]lient|start-client\.sh).*$|@/usr/bin/remoterelay-client|' "$lx_autostart"
+                    chown "$user_name:" "$lx_autostart" 2>/dev/null || true
+                fi
+            done
+
+            # 6. Remove legacy client directories once config/autostart migration is complete
+            if [ -d "$user_home/RemoteRelay/client" ]; then
+                echo "Removing legacy client files at $user_home/RemoteRelay/client..."
+                rm -rf "$user_home/RemoteRelay/client"
+                cleanup_empty_legacy_parent "$user_home/RemoteRelay"
+            fi
+            if [ -d "$user_home/.local/share/RemoteRelay/Client" ]; then
+                echo "Removing legacy client files at $user_home/.local/share/RemoteRelay/Client..."
+                rm -rf "$user_home/.local/share/RemoteRelay/Client"
+                cleanup_empty_legacy_parent "$user_home/.local/share/RemoteRelay"
+            fi
         done
+
+        # Also check legacy install.conf custom base dir if present
+        if [ -f /etc/remoterelay/install.conf ]; then
+            # shellcheck disable=SC1091
+            . /etc/remoterelay/install.conf
+            if [ -n "${RR_CONF_BASE_DIR:-}" ] && [ -d "${RR_CONF_BASE_DIR}/client" ]; then
+                rm -rf "${RR_CONF_BASE_DIR}/client"
+                cleanup_empty_legacy_parent "${RR_CONF_BASE_DIR}"
+            fi
+        fi
+
+        cleanup_shared_legacy_tools
 
         # Update desktop database
         if command -v update-desktop-database >/dev/null 2>&1; then
             update-desktop-database -q /usr/share/applications || true
         fi
+
+        # Relaunch client for users that were running it before install/upgrade,
+        # or if autostart is configured and a desktop session is currently active.
+        MARKER="/run/remoterelay-client-restart-users"
+        if [ -s "$MARKER" ]; then
+            while IFS= read -r ruser; do
+                [ -n "$ruser" ] && relaunch_client_for_user "$ruser"
+            done < "$MARKER"
+        else
+            for user_home in /home/*; do
+                [ -d "$user_home" ] || continue
+                user_name=$(basename "$user_home")
+                if [ -f "$user_home/.config/autostart/remote-relay-client.desktop" ] || \
+                   { [ -f "$user_home/.config/wayfire.ini" ] && grep -q "remote-relay-client" "$user_home/.config/wayfire.ini" 2>/dev/null; }; then
+                    relaunch_client_for_user "$user_name"
+                fi
+            done
+        fi
+        rm -f "$MARKER"
         ;;
 esac
 

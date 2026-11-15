@@ -13,5 +13,8 @@ remote-relay-installer-linux-arm64.sh
 
 # Runtime-generated config files
 config.json
+!packaging/debian/server/config/config.json
+!packaging/debian/client/bin/
+!packaging/debian/client/bin/**
 ClientConfig.json
 ServerDetails.json

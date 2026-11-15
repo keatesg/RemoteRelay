@@ -141,16 +141,18 @@ chmod 644 "$SERVER_STAGE/DEBIAN/control"
 echo "--> Assembling remoterelay-client package..."
 
 mkdir -p "$CLIENT_STAGE/usr/bin"
-ln -sf /usr/lib/remoterelay/client/RemoteRelay "$CLIENT_STAGE/usr/bin/remoterelay-client"
+cp "$SCRIPT_DIR/client/bin/remoterelay-client" "$CLIENT_STAGE/usr/bin/remoterelay-client"
+chmod 755 "$CLIENT_STAGE/usr/bin/remoterelay-client"
 
 mkdir -p "$CLIENT_STAGE/usr/share/applications"
 cp "$SCRIPT_DIR/client/desktop/remoterelay.desktop" "$CLIENT_STAGE/usr/share/applications/"
 
 mkdir -p "$CLIENT_STAGE/DEBIAN"
+cp "$SCRIPT_DIR/client/DEBIAN/preinst" "$CLIENT_STAGE/DEBIAN/"
 cp "$SCRIPT_DIR/client/DEBIAN/postinst" "$CLIENT_STAGE/DEBIAN/"
 cp "$SCRIPT_DIR/client/DEBIAN/postrm" "$CLIENT_STAGE/DEBIAN/"
 
-chmod 755 "$CLIENT_STAGE/DEBIAN/postinst" "$CLIENT_STAGE/DEBIAN/postrm"
+chmod 755 "$CLIENT_STAGE/DEBIAN/preinst" "$CLIENT_STAGE/DEBIAN/postinst" "$CLIENT_STAGE/DEBIAN/postrm"
 chmod 644 "$CLIENT_STAGE/usr/share/applications/remoterelay.desktop"
 
 CLIENT_SIZE=$(du -sk "$CLIENT_STAGE" | cut -f1)

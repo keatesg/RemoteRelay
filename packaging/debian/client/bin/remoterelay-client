@@ -1,0 +1,47 @@
+#!/bin/sh
+set -e
+
+CLIENT_BIN="/usr/lib/remoterelay/client/RemoteRelay"
+
+# Fast-path informational CLI invocations without touching display/env waits
+case "${1:-}" in
+    --version|-v|--help|-h)
+        exec "$CLIENT_BIN" "$@"
+        ;;
+esac
+
+# Check for ARMv8.1+ LSE/atomics support to prevent crashes on older CPUs (e.g. Raspberry Pi 3)
+if [ -r /proc/cpuinfo ]; then
+    if ! grep -qE '\b(lse|atomics)\b' /proc/cpuinfo 2>/dev/null; then
+        export DOTNET_EnableHWIntrinsic=0
+        export DOTNET_EnableLse=0
+    fi
+fi
+
+# When launched early during desktop autostart, wait briefly for Wayland/X11 socket readiness
+display_ready() {
+    if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -e "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
+        return 0
+    fi
+    if [ -n "${DISPLAY:-}" ]; then
+        if command -v xdpyinfo >/dev/null 2>&1; then
+            xdpyinfo >/dev/null 2>&1 && return 0
+        else
+            disp_num="${DISPLAY#:}"
+            disp_num="${disp_num%%.*}"
+            [ -S "/tmp/.X11-unix/X${disp_num}" ] && return 0
+        fi
+    fi
+    return 1
+}
+
+if ! display_ready; then
+    waited=0
+    while [ "$waited" -lt 15 ]; do
+        sleep 1
+        waited=$((waited + 1))
+        display_ready && break
+    done
+fi
+
+exec "$CLIENT_BIN" "$@"

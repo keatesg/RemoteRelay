@@ -1,0 +1,32 @@
+#!/bin/sh
+set -e
+
+MARKER="/run/remoterelay-client-restart-users"
+
+case "$1" in
+    install|upgrade)
+        rm -f "$MARKER"
+
+        # Record users currently running the client so postinst can relaunch it
+        if command -v pgrep >/dev/null 2>&1; then
+            {
+                pgrep -x RemoteRelay -o >/dev/null 2>&1 && ps -eo user:64,comm | awk '$2 == "RemoteRelay" { print $1 }'
+                pgrep -f "start-client\.sh" >/dev/null 2>&1 && ps -eo user:64,args | awk '/start-client\.sh/ && !/awk/ { print $1 }'
+            } | sort -u > "$MARKER" || true
+        fi
+
+        # Stop legacy launcher watchdog first, then the client binary (exact name so Server/Configurator stay untouched)
+        pkill -f "start-client\.sh" >/dev/null 2>&1 || true
+        pkill -x "RemoteRelay" >/dev/null 2>&1 || true
+
+        # Give it a moment to exit cleanly, then force-kill if still running
+        tries=0
+        while pgrep -x "RemoteRelay" >/dev/null 2>&1 && [ "$tries" -lt 10 ]; do
+            sleep 0.2 2>/dev/null || sleep 1
+            tries=$((tries + 1))
+        done
+        pkill -9 -x "RemoteRelay" >/dev/null 2>&1 || true
+        ;;
+esac
+
+exit 0

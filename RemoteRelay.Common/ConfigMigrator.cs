@@ -33,10 +33,51 @@ public static class ConfigMigrator
             return false;
         }
 
-        // v0 -> v1: no shape change; v0 files simply predate versioning.
+        if (version < 1)
+        {
+            // v0 -> v1: pre-versioning files could store PhysicalSourceButtons as
+            // { "<source>": <pinInt> } instead of { "<source>": { "PinNumber": <pinInt>, "TriggerState": "Low" } }.
+            MigrateLegacyPhysicalButtons(config);
+        }
 
         SetVersion(config, AppSettings.CurrentConfigVersion);
         return true;
+    }
+
+    private static void MigrateLegacyPhysicalButtons(JsonObject config)
+    {
+        foreach (var property in config)
+        {
+            if (!string.Equals(property.Key, nameof(AppSettings.PhysicalSourceButtons), StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (property.Value is not JsonObject buttons)
+            {
+                return;
+            }
+
+            var keysToMigrate = new System.Collections.Generic.List<(string Key, int Pin)>();
+            foreach (var entry in buttons)
+            {
+                if (entry.Value is JsonValue val && val.TryGetValue<int>(out var pin))
+                {
+                    keysToMigrate.Add((entry.Key, pin));
+                }
+            }
+
+            foreach (var (key, pin) in keysToMigrate)
+            {
+                buttons[key] = new JsonObject
+                {
+                    [nameof(PhysicalButtonConfig.PinNumber)] = pin,
+                    [nameof(PhysicalButtonConfig.TriggerState)] = "Low"
+                };
+            }
+
+            return;
+        }
     }
 
     // Property-name matching is case-insensitive everywhere else the config is

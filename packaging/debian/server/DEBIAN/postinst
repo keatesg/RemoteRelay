@@ -1,6 +1,75 @@
 #!/bin/sh
 set -e
 
+cleanup_empty_legacy_parent() {
+    base_dir="$1"
+    [ -d "$base_dir" ] || return 0
+    if [ ! -d "$base_dir/client" ] && [ ! -d "$base_dir/Client" ]; then
+        rm -rf "$base_dir/lib" "$base_dir/update.sh" "$base_dir/uninstall.sh"
+        rmdir "$base_dir" 2>/dev/null || true
+    fi
+}
+
+cleanup_shared_legacy_tools() {
+    for udir in /home/* /root; do
+        [ -d "$udir" ] || continue
+        if [ -d "$udir/RemoteRelay/server" ] || [ -d "$udir/RemoteRelay/client" ] || \
+           [ -d "$udir/.local/share/RemoteRelay/Server" ] || [ -d "$udir/.local/share/RemoteRelay/Client" ]; then
+            return 0
+        fi
+    done
+
+    rm -f /usr/local/bin/remoterelay
+    rm -rf /usr/local/lib/remoterelay
+    rm -f /etc/remoterelay/install.conf /etc/remoterelay/rollback.conf
+    rm -f /etc/systemd/system/remote-relay-server.service.legacy-backup
+}
+
+migrate_logo_if_in_legacy_dir() {
+    legacy_dir="$1"
+    conf_file="/etc/remoterelay/config.json"
+    [ -n "$legacy_dir" ] && [ -f "$conf_file" ] || return 0
+
+    logo_val=""
+    if command -v jq >/dev/null 2>&1; then
+        logo_val=$(jq -r '.LogoFile // empty' "$conf_file" 2>/dev/null || true)
+    elif command -v python3 >/dev/null 2>&1; then
+        logo_val=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("LogoFile") or "")' "$conf_file" 2>/dev/null || true)
+    fi
+
+    [ -n "$logo_val" ] || return 0
+
+    src_logo=""
+    case "$logo_val" in
+        "$legacy_dir"/*)
+            [ -f "$logo_val" ] && src_logo="$logo_val"
+            ;;
+        /*)
+            src_logo=""
+            ;;
+        *)
+            [ -f "$legacy_dir/$logo_val" ] && src_logo="$legacy_dir/$logo_val"
+            ;;
+    esac
+
+    if [ -n "$src_logo" ] && [ -f "$src_logo" ]; then
+        dest_logo="/etc/remoterelay/$(basename "$src_logo")"
+        cp -a "$src_logo" "$dest_logo"
+        chmod 644 "$dest_logo"
+        if command -v jq >/dev/null 2>&1; then
+            tmp_conf=$(mktemp)
+            if jq --arg p "$dest_logo" '.LogoFile = $p' "$conf_file" > "$tmp_conf" 2>/dev/null; then
+                mv "$tmp_conf" "$conf_file"
+            else
+                rm -f "$tmp_conf"
+            fi
+        elif command -v python3 >/dev/null 2>&1; then
+            python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["LogoFile"]=sys.argv[2]; json.dump(d,open(p,"w"),indent=2)' "$conf_file" "$dest_logo" 2>/dev/null || true
+        fi
+        echo "Migrated logo file to $dest_logo"
+    fi
+}
+
 case "$1" in
     configure)
         # Ensure /etc/remoterelay exists and has proper permissions
@@ -16,9 +85,41 @@ case "$1" in
             mv /etc/remoterelay/config.json.legacy-migrated /etc/remoterelay/config.json
         fi
 
+        if [ -f /etc/remoterelay/.legacy-server-dir ]; then
+            LEGACY_SERVER_DIR=$(cat /etc/remoterelay/.legacy-server-dir 2>/dev/null || true)
+            migrate_logo_if_in_legacy_dir "$LEGACY_SERVER_DIR"
+            rm -f /etc/remoterelay/.legacy-server-dir
+        fi
+
         if [ -f /etc/remoterelay/config.json ]; then
             chmod 644 /etc/remoterelay/config.json
         fi
+
+        # Clean up legacy server directories now that config has been migrated
+        if [ -f /etc/remoterelay/install.conf ]; then
+            # shellcheck disable=SC1091
+            . /etc/remoterelay/install.conf
+            if [ -n "${RR_CONF_BASE_DIR:-}" ] && [ -d "${RR_CONF_BASE_DIR}/server" ]; then
+                rm -rf "${RR_CONF_BASE_DIR}/server"
+                cleanup_empty_legacy_parent "${RR_CONF_BASE_DIR}"
+            fi
+        fi
+
+        for udir in /home/* /root; do
+            [ -d "$udir" ] || continue
+            if [ -d "$udir/RemoteRelay/server" ]; then
+                echo "Removing legacy server files at $udir/RemoteRelay/server..."
+                rm -rf "$udir/RemoteRelay/server"
+                cleanup_empty_legacy_parent "$udir/RemoteRelay"
+            fi
+            if [ -d "$udir/.local/share/RemoteRelay/Server" ]; then
+                echo "Removing legacy server files at $udir/.local/share/RemoteRelay/Server..."
+                rm -rf "$udir/.local/share/RemoteRelay/Server"
+                cleanup_empty_legacy_parent "$udir/.local/share/RemoteRelay"
+            fi
+        done
+
+        cleanup_shared_legacy_tools
 
         # Reload systemd and enable/restart service if systemd is active
         if [ -d /run/systemd/system ]; then

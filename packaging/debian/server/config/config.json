@@ -1,0 +1,15 @@
+{
+  "ConfigVersion": 1,
+  "Routes": [],
+  "DefaultRoutes": {},
+  "PhysicalSourceButtons": {},
+  "SourceColorPalette": {},
+  "ServerPort": 33101,
+  "RelayDriver": "Auto",
+  "FlashOnSelect": true,
+  "ShowIpOnScreen": true,
+  "ShowClockOnScreen": true,
+  "Logging": true,
+  "LogoFile": "",
+  "ThemePalette": "Default"
+}

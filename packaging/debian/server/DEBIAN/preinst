@@ -3,27 +3,46 @@ set -e
 
 case "$1" in
     install|upgrade)
-        # 1. Stop any currently active server daemon or process
+        # 1. Stop any currently active system server daemon or process
         if [ -d /run/systemd/system ]; then
             systemctl stop remote-relay-server.service >/dev/null 2>&1 || true
         fi
-        pkill -f "RemoteRelay.Server" >/dev/null 2>&1 || true
+        pkill -x "RemoteRelay.Server" >/dev/null 2>&1 || true
+        pkill -f "RemoteRelay\.Server" >/dev/null 2>&1 || true
 
-        # 2. Check for legacy /etc/systemd/system/remote-relay-server.service conflict.
+        # 2. Stop, disable, and remove legacy user-level systemd services (~/.config/systemd/user/)
+        for udir in /home/* /root; do
+            [ -d "$udir" ] || continue
+            user_unit="$udir/.config/systemd/user/remote-relay-server.service"
+            user_wants="$udir/.config/systemd/user/default.target.wants/remote-relay-server.service"
+            if [ -f "$user_unit" ] || [ -L "$user_wants" ]; then
+                uname=$(basename "$udir")
+                [ "$udir" = "/root" ] && uname="root"
+                uid=$(id -u "$uname" 2>/dev/null || true)
+                if [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
+                    su -s /bin/sh "$uname" -c "XDG_RUNTIME_DIR=/run/user/$uid systemctl --user disable --now remote-relay-server.service" >/dev/null 2>&1 || true
+                fi
+                rm -f "$user_wants" "$user_unit"
+                echo "Removed legacy user systemd service for $uname."
+            fi
+        done
+
+        # 3. Move legacy /etc/systemd/system/remote-relay-server.service out of the way.
         # Older makeself installers wrote directly to /etc/systemd/system/, which overrides
         # vendor package unit files in /lib/systemd/system/.
         if [ -f /etc/systemd/system/remote-relay-server.service ]; then
             if grep -q "RemoteRelay/server" /etc/systemd/system/remote-relay-server.service 2>/dev/null || \
                ! grep -q "/usr/bin/remoterelay-server" /etc/systemd/system/remote-relay-server.service 2>/dev/null; then
-                echo "Found legacy service unit at /etc/systemd/system/remote-relay-server.service. Backing up..."
-                mv /etc/systemd/system/remote-relay-server.service /etc/systemd/system/remote-relay-server.service.legacy-backup
+                echo "Found legacy service unit at /etc/systemd/system/remote-relay-server.service. Moving backup to /etc/remoterelay/..."
+                mkdir -p /etc/remoterelay
+                mv /etc/systemd/system/remote-relay-server.service /etc/remoterelay/remote-relay-server.service.legacy-backup
                 if [ -d /run/systemd/system ]; then
                     systemctl --system daemon-reload >/dev/null 2>&1 || true
                 fi
             fi
         fi
 
-        # 3. Detect and stage legacy server configuration for migration.
+        # 4. Detect and stage legacy server configuration for migration.
         # If /etc/remoterelay/config.json does not exist, look for configs from older versions.
         if [ ! -f /etc/remoterelay/config.json ] && [ ! -f /etc/remoterelay/config.json.legacy-migrated ]; then
             LEGACY_CONF=""
@@ -57,6 +76,7 @@ case "$1" in
                 mkdir -p /etc/remoterelay
                 cp -a "$LEGACY_CONF" /etc/remoterelay/config.json.legacy-migrated
                 chmod 644 /etc/remoterelay/config.json.legacy-migrated
+                dirname "$LEGACY_CONF" > /etc/remoterelay/.legacy-server-dir
             fi
         fi
         ;;
