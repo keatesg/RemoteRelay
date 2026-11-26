@@ -35,19 +35,21 @@
                        Foreground="Orange"
                        FontWeight="Bold" />
         </Viewbox>
-        <Viewbox Stretch="Uniform" StretchDirection="DownOnly"
-                 DockPanel.Dock="Top"
-                 HorizontalAlignment="Center"
-                 Margin="5"
-                 IsVisible="{Binding ShowIpOnScreen}">
-            <TextBlock Text="{Binding ServerStatusMessage}" />
-        </Viewbox>
-        <DockPanel DockPanel.Dock="Bottom" LastChildFill="False">
+        <DockPanel DockPanel.Dock="Bottom" LastChildFill="True">
             <Button Content="⚙ Client Settings"
                     DockPanel.Dock="Left"
                     Command="{Binding OpenConnectionSettingsCommand}"
                     Margin="10"
                     Padding="15,8"/>
+            <Viewbox Stretch="Uniform" StretchDirection="DownOnly"
+                     HorizontalAlignment="Right"
+                     VerticalAlignment="Center"
+                     Margin="10,5,15,5"
+                     IsVisible="{Binding ShowIpOnScreen}">
+                <TextBlock Text="{Binding ServerStatusMessage}"
+                           FontSize="10"
+                           Foreground="#666666" />
+            </Viewbox>
         </DockPanel>
         <ContentControl Content="{Binding OperationViewModel}"
                         IsVisible="{Binding IsOperationViewReady}"

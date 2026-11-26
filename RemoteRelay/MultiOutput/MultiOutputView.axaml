@@ -20,37 +20,38 @@
         </Grid.RowDefinitions>
 
         <!-- Header Grid -->
-        <Grid Grid.Row="0" Margin="15,5,15,0">
+        <Grid Grid.Row="0" Margin="15,6,15,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="8*" />
+                <ColumnDefinition Width="1*" />
             </Grid.ColumnDefinitions>
 
             <!-- IP Address in top left corner -->
-            <Viewbox Grid.Column="0" HorizontalAlignment="Left" StretchDirection="DownOnly" Stretch="Uniform">
+            <Viewbox Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center" StretchDirection="DownOnly" Stretch="Uniform">
                 <TextBlock Text="{Binding HostIpAddress}"
-                           FontSize="14"
-                           Foreground="Gray"
+                           FontSize="10"
+                           Foreground="#666666"
                            IsVisible="{Binding ShowIpOnScreen}" />
             </Viewbox>
 
             <!-- Date and Clock in top center -->
-            <Viewbox Grid.Column="1" HorizontalAlignment="Center" Stretch="Uniform"
+            <Viewbox Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"
+                     Margin="10,2"
                      IsVisible="{Binding ShowClockOnScreen}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="{Binding CurrentDate}"
-                               FontSize="28"
+                               FontSize="36"
                                FontWeight="Bold"
                                Foreground="White"
                                VerticalAlignment="Center" />
                     <TextBlock Text="  ·  "
-                               FontSize="28"
-                               Foreground="Gray"
+                               FontSize="36"
+                               Foreground="#888888"
                                VerticalAlignment="Center" />
                     <TextBlock Text="{Binding CurrentTime}"
                                FontFamily="Consolas, Courier New, monospace"
-                               FontSize="28"
+                               FontSize="36"
                                FontWeight="Bold"
                                Foreground="White"
                                VerticalAlignment="Center" />
@@ -58,10 +59,10 @@
             </Viewbox>
 
             <!-- Filter status in top right corner -->
-            <Viewbox Grid.Column="2" HorizontalAlignment="Right" StretchDirection="DownOnly" Stretch="Uniform">
+            <Viewbox Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" StretchDirection="DownOnly" Stretch="Uniform">
                 <TextBlock Text="{Binding FilterStatusMessage}"
-                           FontSize="14"
-                           Foreground="Gray"
+                           FontSize="10"
+                           Foreground="#666666"
                            IsVisible="{Binding FilterStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             </Viewbox>
         </Grid>
