@@ -118,7 +118,7 @@ public class ConfiguratorClient : IAsyncDisposable
         if (!IsConnected || _connection == null) return null;
 
         _settingsTcs = new TaskCompletionSource<AppSettings?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await _connection.InvokeAsync("RequestSettings");
+        await _connection.InvokeAsync("GetConfiguration");
 
         var completed = await Task.WhenAny(_settingsTcs.Task, Task.Delay(timeout ?? TimeSpan.FromSeconds(5)));
         return completed == _settingsTcs.Task ? await _settingsTcs.Task : null;
