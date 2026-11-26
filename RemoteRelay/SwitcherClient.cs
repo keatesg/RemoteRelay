@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Threading.Tasks; // Added for TaskCompletionSource
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using RemoteRelay.Common;
@@ -290,7 +291,20 @@ public class SwitcherClient
 
         try
         {
-            return await _connection.InvokeAsync<SaveConfigurationResponse>("SaveConfiguration", settings, pin);
+            return await _connection.InvokeAsync<SaveConfigurationResponse>("SaveConfigurationWithPin", settings, pin);
+        }
+        catch (HubException ex) when (ex.Message.Contains("Method does not exist", StringComparison.OrdinalIgnoreCase))
+        {
+            // Backwards compatibility with older servers that only expose 1-argument SaveConfiguration.
+            try
+            {
+                return await _connection.InvokeAsync<SaveConfigurationResponse>("SaveConfiguration", settings);
+            }
+            catch (Exception fallbackEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error sending legacy SaveConfiguration command: {fallbackEx.Message}");
+                return new SaveConfigurationResponse { Success = false, Error = fallbackEx.Message };
+            }
         }
         catch (Exception ex)
         {

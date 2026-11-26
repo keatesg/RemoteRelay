@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using RemoteRelay.Common;
@@ -132,7 +133,19 @@ public class ConfiguratorClient : IAsyncDisposable
 
         try
         {
-            return await _connection.InvokeAsync<SaveConfigurationResponse>("SaveConfiguration", settings, pin);
+            return await _connection.InvokeAsync<SaveConfigurationResponse>("SaveConfigurationWithPin", settings, pin);
+        }
+        catch (HubException ex) when (ex.Message.Contains("Method does not exist", StringComparison.OrdinalIgnoreCase))
+        {
+            // Backwards compatibility with older servers that only expose 1-argument SaveConfiguration.
+            try
+            {
+                return await _connection.InvokeAsync<SaveConfigurationResponse>("SaveConfiguration", settings);
+            }
+            catch (Exception fallbackEx)
+            {
+                return new SaveConfigurationResponse { Success = false, Error = fallbackEx.Message };
+            }
         }
         catch (Exception ex)
         {

@@ -83,19 +83,21 @@ public class RelayHub : Hub
     }
 
     /// <summary>
-    /// Overload for clients that do not pass a PIN.
+    /// Legacy 1-argument hub method for older clients that do not pass a PIN.
+    /// Delegates to <see cref="SaveConfigurationWithPin"/> with a null PIN.
     /// </summary>
     public Task<SaveConfigurationResponse> SaveConfiguration(AppSettings settings)
     {
-        return SaveConfiguration(settings, null);
+        return SaveConfigurationWithPin(settings, null);
     }
 
     /// <summary>
     /// Saves the provided configuration to the server's config.json file.
     /// If the server has a ConfigPin configured, providedPin must match it.
+    /// Distinct hub method name because SignalR does not support method overloading.
     /// </summary>
     /// <returns>A response indicating success or failure with error message.</returns>
-    public async Task<SaveConfigurationResponse> SaveConfiguration(AppSettings settings, string? providedPin)
+    public async Task<SaveConfigurationResponse> SaveConfigurationWithPin(AppSettings settings, string? providedPin)
     {
         var current = _switcherState.GetSettings();
         if (!string.IsNullOrWhiteSpace(current.ConfigPin))
