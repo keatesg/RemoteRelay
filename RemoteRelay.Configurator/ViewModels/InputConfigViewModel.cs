@@ -67,6 +67,8 @@ public class InputConfigViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _physicalButtonTrigger, value);
     }
 
+    public System.Collections.Generic.IReadOnlyList<string> AvailableTriggerStates { get; } = new[] { "Low", "High" };
+
     public ObservableCollection<RouteConfigViewModel> OutputRoutes { get; } = new();
 
     public ICommand AddOutputRouteCommand { get; }

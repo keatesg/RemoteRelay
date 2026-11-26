@@ -138,10 +138,9 @@
                         <TextBlock Text="Relay Pin:" Classes="label"/>
                         <NumericUpDown Value="{Binding InactiveRelayPin}" Minimum="0" Maximum="40" Width="90"/>
                         <TextBlock Text="Inactive State:" Classes="label"/>
-                        <ComboBox SelectedItem="{Binding InactiveRelayState}" Width="100">
-                            <ComboBoxItem Content="High"/>
-                            <ComboBoxItem Content="Low"/>
-                        </ComboBox>
+                        <ComboBox ItemsSource="{Binding AvailablePinStates}"
+                                  SelectedItem="{Binding InactiveRelayState}"
+                                  Width="100"/>
                     </StackPanel>
                 </Border>
 
@@ -182,10 +181,9 @@
                                         <TextBlock Text="GPIO Pushbutton Pin:" Classes="label"/>
                                         <NumericUpDown Value="{Binding PhysicalButtonPin}" Minimum="0" Maximum="40" Width="80"/>
                                         <TextBlock Text="Trigger:" Classes="label"/>
-                                        <ComboBox SelectedItem="{Binding PhysicalButtonTrigger}" Width="90">
-                                            <ComboBoxItem Content="Low"/>
-                                            <ComboBoxItem Content="High"/>
-                                        </ComboBox>
+                                        <ComboBox ItemsSource="{Binding AvailableTriggerStates}"
+                                                  SelectedItem="{Binding PhysicalButtonTrigger}"
+                                                  Width="90"/>
                                     </StackPanel>
 
                                     <!-- Add Output Button -->
@@ -209,6 +207,8 @@
                                                         <NumericUpDown Value="{Binding RelayPin}" Minimum="0" Maximum="64" Width="80"/>
 
                                                         <CheckBox IsChecked="{Binding ActiveLow}" Content="Active Low" VerticalAlignment="Center" Margin="5,0"/>
+
+                                                        <TextBox Text="{Binding TcpMessage}" PlaceholderText="TCP msg (optional)" Width="140"/>
 
                                                         <Button Content="⚡ Test Switch" Command="{Binding TestRouteCommand}" Classes="test-btn" Background="#007ACC" Foreground="White"/>
                                                         <Button Content="🗑" Command="{Binding DeleteRouteCommand}" Classes="delete-btn"/>

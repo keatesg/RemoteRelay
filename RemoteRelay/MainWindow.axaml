@@ -45,7 +45,7 @@
                      HorizontalAlignment="Right"
                      VerticalAlignment="Center"
                      Margin="10,5,15,5"
-                     IsVisible="{Binding ShowIpOnScreen}">
+                     IsVisible="{Binding ShowServerStatus}">
                 <TextBlock Text="{Binding ServerStatusMessage}"
                            FontSize="10"
                            Foreground="#666666" />

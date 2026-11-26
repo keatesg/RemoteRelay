@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+# Check for ARMv8.1+ LSE/atomics support to prevent SIGILL crashes on older CPUs (e.g. Raspberry Pi 3)
+if [ -r /proc/cpuinfo ]; then
+    if ! grep -qE '\b(lse|atomics)\b' /proc/cpuinfo 2>/dev/null; then
+        export DOTNET_EnableHWIntrinsic=0
+        export DOTNET_EnableLse=0
+    fi
+fi
+
+exec /usr/lib/remoterelay/configurator/RemoteRelay.Configurator "$@"

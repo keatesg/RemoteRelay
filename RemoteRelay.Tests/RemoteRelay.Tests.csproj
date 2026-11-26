@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RemoteRelay.Common\RemoteRelay.Common.csproj" />
+    <ProjectReference Include="..\RemoteRelay.Configurator\RemoteRelay.Configurator.csproj" />
     <ProjectReference Include="..\RemoteRelay.Server\RemoteRelay.Server.csproj" />
   </ItemGroup>
 

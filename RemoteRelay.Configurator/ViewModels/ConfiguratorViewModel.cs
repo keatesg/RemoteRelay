@@ -17,6 +17,13 @@ public class ConfiguratorViewModel : ViewModelBase
 {
     private readonly ConfiguratorClient? _client;
     private readonly Func<string?> _getProvidedPin;
+    private string? _originalDefaultSource;
+    private bool _originalUseMockGpio;
+    private int _sainSmartBaudRate = 9600;
+    private int _lcusBaudRate = 9600;
+    private int _modbusBaudRate = 9600;
+
+    public IReadOnlyList<string> AvailablePinStates { get; } = new[] { "High", "Low" };
 
     private int _serverPort = 33101;
     public int ServerPort
@@ -218,15 +225,20 @@ public class ConfiguratorViewModel : ViewModelBase
     {
         ServerPort = settings.ServerPort > 0 ? settings.ServerPort : 33101;
         ConfigPin = settings.ConfigPin;
+        _originalDefaultSource = settings.DefaultSource;
+        _originalUseMockGpio = settings.UseMockGpio;
         RelayDriver = settings.RelayDriver ?? "Auto";
         K8090Port = settings.K8090?.Port ?? string.Empty;
         SainSmartPort = settings.SainSmart?.Port ?? string.Empty;
         SainSmartChannels = settings.SainSmart?.Channels ?? 4;
+        _sainSmartBaudRate = settings.SainSmart?.BaudRate ?? 9600;
         LcusPort = settings.LCUS?.Port ?? string.Empty;
         LcusChannels = settings.LCUS?.Channels ?? 4;
+        _lcusBaudRate = settings.LCUS?.BaudRate ?? 9600;
         ModbusPort = settings.ModbusRTU?.Port ?? string.Empty;
         ModbusChannels = settings.ModbusRTU?.Channels ?? 8;
         ModbusSlaveId = settings.ModbusRTU?.SlaveId ?? 1;
+        _modbusBaudRate = settings.ModbusRTU?.BaudRate ?? 9600;
 
         TcpMirrorAddress = settings.TcpMirrorAddress ?? string.Empty;
         TcpMirrorPort = settings.TcpMirrorPort;
@@ -236,6 +248,11 @@ public class ConfiguratorViewModel : ViewModelBase
         {
             InactiveRelayPin = settings.InactiveRelay.Pin;
             InactiveRelayState = settings.InactiveRelay.InactiveState;
+        }
+        else
+        {
+            InactiveRelayPin = 0;
+            InactiveRelayState = "High";
         }
 
         FlashOnSelect = settings.FlashOnSelect;
@@ -280,7 +297,7 @@ public class ConfiguratorViewModel : ViewModelBase
                         route.OutputName,
                         route.RelayPin,
                         route.ActiveLow,
-                        string.Empty,
+                        route.TcpMessage ?? string.Empty,
                         () => r => inputVm.OutputRoutes.Remove(r),
                         () => inputVm.SourceName,
                         _client));
@@ -290,7 +307,7 @@ public class ConfiguratorViewModel : ViewModelBase
             }
         }
 
-        RebuildDefaultRoutes();
+        RebuildDefaultRoutes(settings.DefaultRoutes);
     }
 
     private void AddInput()
@@ -323,29 +340,49 @@ public class ConfiguratorViewModel : ViewModelBase
         RebuildDefaultRoutes();
     }
 
-    public void RebuildDefaultRoutes()
+    public void RebuildDefaultRoutes(IReadOnlyDictionary<string, string>? initialDefaults = null)
     {
         var allOutputs = Inputs.SelectMany(i => i.OutputRoutes).Select(r => r.OutputName).Distinct().ToList();
 
-        var existingMap = DefaultRoutes.ToDictionary(d => d.SourceName, d => d.SelectedOutput);
+        var existingMap = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        if (initialDefaults != null)
+        {
+            foreach (var kvp in initialDefaults)
+            {
+                existingMap[kvp.Key] = kvp.Value;
+            }
+        }
+        else
+        {
+            foreach (var d in DefaultRoutes)
+            {
+                existingMap[d.SourceName] = d.SelectedOutput;
+            }
+        }
+
         DefaultRoutes.Clear();
 
         foreach (var input in Inputs)
         {
             existingMap.TryGetValue(input.SourceName, out var currentOutput);
-            var defaultVm = new DefaultRouteViewModel(input.SourceName, currentOutput);
+            var defaultVm = new DefaultRouteViewModel(input.SourceName, DefaultRouteViewModel.NoDefaultOutput);
+            defaultVm.AvailableOutputs.Add(DefaultRouteViewModel.NoDefaultOutput);
             foreach (var outName in allOutputs)
             {
                 defaultVm.AvailableOutputs.Add(outName);
             }
-            if (!string.IsNullOrEmpty(currentOutput) && allOutputs.Contains(currentOutput))
+
+            if (!string.IsNullOrEmpty(currentOutput) &&
+                currentOutput != DefaultRouteViewModel.NoDefaultOutput &&
+                allOutputs.Contains(currentOutput))
             {
                 defaultVm.SelectedOutput = currentOutput;
             }
-            else if (allOutputs.Count > 0)
+            else
             {
-                defaultVm.SelectedOutput = allOutputs[0];
+                defaultVm.SelectedOutput = DefaultRouteViewModel.NoDefaultOutput;
             }
+
             DefaultRoutes.Add(defaultVm);
         }
     }
@@ -356,6 +393,8 @@ public class ConfiguratorViewModel : ViewModelBase
         {
             ServerPort = ServerPort,
             ConfigPin = string.IsNullOrWhiteSpace(ConfigPin) ? null : ConfigPin.Trim(),
+            DefaultSource = _originalDefaultSource,
+            UseMockGpio = _originalUseMockGpio,
             RelayDriver = RelayDriver,
             FlashOnSelect = FlashOnSelect,
             ShowIpOnScreen = ShowIpOnScreen,
@@ -368,21 +407,21 @@ public class ConfiguratorViewModel : ViewModelBase
             UdpApiPort = UdpApiPort
         };
 
-        if (RelayDriver == "K8090")
+        if (RelayDriver == "K8090" || !string.IsNullOrWhiteSpace(K8090Port))
         {
             settings.K8090 = new K8090Settings { Port = K8090Port };
         }
-        else if (RelayDriver == "SainSmart")
+        if (RelayDriver == "SainSmart" || !string.IsNullOrWhiteSpace(SainSmartPort))
         {
-            settings.SainSmart = new SainSmartSettings { Port = SainSmartPort, Channels = SainSmartChannels };
+            settings.SainSmart = new SainSmartSettings { Port = SainSmartPort, Channels = SainSmartChannels, BaudRate = _sainSmartBaudRate };
         }
-        else if (RelayDriver == "LCUS")
+        if (RelayDriver == "LCUS" || !string.IsNullOrWhiteSpace(LcusPort))
         {
-            settings.LCUS = new LcusSettings { Port = LcusPort, Channels = LcusChannels };
+            settings.LCUS = new LcusSettings { Port = LcusPort, Channels = LcusChannels, BaudRate = _lcusBaudRate };
         }
-        else if (RelayDriver == "ModbusRTU")
+        if (RelayDriver == "ModbusRTU" || !string.IsNullOrWhiteSpace(ModbusPort))
         {
-            settings.ModbusRTU = new ModbusSettings { Port = ModbusPort, Channels = ModbusChannels, SlaveId = ModbusSlaveId };
+            settings.ModbusRTU = new ModbusSettings { Port = ModbusPort, Channels = ModbusChannels, BaudRate = _modbusBaudRate, SlaveId = ModbusSlaveId };
         }
 
         if (InactiveRelayPin > 0)
@@ -421,7 +460,8 @@ public class ConfiguratorViewModel : ViewModelBase
                     SourceName = input.SourceName,
                     OutputName = route.OutputName,
                     RelayPin = route.RelayPin,
-                    ActiveLow = route.ActiveLow
+                    ActiveLow = route.ActiveLow,
+                    TcpMessage = string.IsNullOrWhiteSpace(route.TcpMessage) ? null : route.TcpMessage
                 });
             }
         }
@@ -433,7 +473,7 @@ public class ConfiguratorViewModel : ViewModelBase
         var defaultRoutes = new Dictionary<string, string>();
         foreach (var d in DefaultRoutes)
         {
-            if (!string.IsNullOrEmpty(d.SelectedOutput))
+            if (!string.IsNullOrEmpty(d.SelectedOutput) && d.SelectedOutput != DefaultRouteViewModel.NoDefaultOutput)
             {
                 defaultRoutes[d.SourceName] = d.SelectedOutput;
             }

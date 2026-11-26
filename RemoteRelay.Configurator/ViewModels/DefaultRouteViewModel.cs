@@ -5,6 +5,8 @@ namespace RemoteRelay.Configurator.ViewModels;
 
 public class DefaultRouteViewModel : ViewModelBase
 {
+    public const string NoDefaultOutput = "(None)";
+
     private string _sourceName = string.Empty;
     public string SourceName
     {

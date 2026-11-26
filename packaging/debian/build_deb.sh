@@ -90,8 +90,9 @@ dotnet publish "$ROOT_DIR/RemoteRelay/RemoteRelay.csproj" \
 echo "--> Assembling remoterelay-server package..."
 
 mkdir -p "$SERVER_STAGE/usr/bin"
-ln -sf /usr/lib/remoterelay/server/RemoteRelay.Server "$SERVER_STAGE/usr/bin/remoterelay-server"
-ln -sf /usr/lib/remoterelay/configurator/RemoteRelay.Configurator "$SERVER_STAGE/usr/bin/remoterelay-config"
+cp "$SCRIPT_DIR/server/bin/remoterelay-server" "$SERVER_STAGE/usr/bin/remoterelay-server"
+cp "$SCRIPT_DIR/server/bin/remoterelay-config" "$SERVER_STAGE/usr/bin/remoterelay-config"
+chmod 755 "$SERVER_STAGE/usr/bin/remoterelay-server" "$SERVER_STAGE/usr/bin/remoterelay-config"
 
 mkdir -p "$SERVER_STAGE/lib/systemd/system"
 cp "$SCRIPT_DIR/server/systemd/remote-relay-server.service" "$SERVER_STAGE/lib/systemd/system/"

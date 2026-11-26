@@ -70,10 +70,13 @@ public class MainWindowViewModel : ViewModelBase
 
             this.RaiseAndSetIfChanged(ref _operationViewModel, value);
             this.RaisePropertyChanged(nameof(IsOperationViewReady));
+            this.RaisePropertyChanged(nameof(ShowServerStatus));
         }
     }
 
     public bool IsOperationViewReady => _operationViewModel != null;
+
+    public bool ShowServerStatus => ShowIpOnScreen || !IsOperationViewReady;
 
     public bool IsFullscreen => _clientConfig.IsFullscreen ?? true;
 
@@ -87,7 +90,11 @@ public class MainWindowViewModel : ViewModelBase
     public bool ShowIpOnScreen
     {
         get => _showIpOnScreen;
-        set => this.RaiseAndSetIfChanged(ref _showIpOnScreen, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _showIpOnScreen, value);
+            this.RaisePropertyChanged(nameof(ShowServerStatus));
+        }
     }
 
     public ICommand OpenConnectionSettingsCommand { get; }
